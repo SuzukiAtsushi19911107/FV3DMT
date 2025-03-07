@@ -1,0 +1,37 @@
+/*
+FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
+*/
+#pragma once
+#include <iostream>
+#include <vector>
+#include <Eigen/SparseCore>
+#include <stdio.h>
+#include <Eigen/Sparse>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+
+
+namespace Function {
+	class Function;
+}
+
+
+namespace Property {
+	class Property {
+	public:
+		Property();
+		int ID = -1;
+		double resistivity;
+		enum types {NORMAL,AIR,FIXED}; //type 0:normal 1:air 2:fixed
+		types type;
+
+		double density = -1.0;
+		double specificHeat = -1.0;
+		int conductivityFuncID = -1;
+		Function::Function* conductivityFunction;
+		int densityFuncID = -1;
+		Function::Function* densityFunction;
+		int specificHeatFuncID = -1;
+		Function::Function* specificHeatFunction;
+	};
+}
