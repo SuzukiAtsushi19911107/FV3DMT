@@ -35,7 +35,6 @@ namespace optim
 
     // line search
     #include "line_search/more_thuente.hpp"
-	#include "line_search/back_tracking.hpp"
 
     // unconstrained optimization
     #include "unconstrained/optim_unconstrained.hpp"
