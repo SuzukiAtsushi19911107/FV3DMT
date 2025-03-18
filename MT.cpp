@@ -90,12 +90,12 @@ int main(int args, char* argv[])
 	//omp_set_num_threads(std::min(omp_get_max_threads(), int(analysis->boundary->omega.size())));
 	std::cout << "omp_get_max_threads:" << omp_get_max_threads() << std::endl;
 
-	if (omp_get_max_threads() >= 2 * analysis->boundary->omega.size()) {
-		omp_set_nested(1);
-	}
-	else {
+	//if (omp_get_max_threads() >= 2 * analysis->boundary->omega.size()) {
+	//	omp_set_nested(1);
+	//}
+	//else {
 		omp_set_nested(0);
-	}
+	//}
 
 	if (forwardCalc == true) {
 		cout << "Calculation Type:Forward Calculation Mode" << endl;

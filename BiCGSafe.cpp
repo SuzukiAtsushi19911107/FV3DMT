@@ -1484,7 +1484,7 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
     for (int i = 0; i < numOfSols; i++) {
         finishedEachSols[i] = false;
     }
-#pragma omp parallel for
+//#pragma omp parallel for
     for (int i = 0; i < numOfSols; i++) {
         while (true) {
             //while (m_lastRelativeSolChange == 0.0 || (m_lastRelativeSolChange > tol && iter < maxIters) || minIters > iter) {
