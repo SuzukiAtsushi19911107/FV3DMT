@@ -31,5 +31,4 @@
 #include "nm.hpp"
 #include "pso.hpp"
 #include "pso_dv.hpp"
-#include "lbfgs_gd.hpp"
 #endif
