@@ -1,6 +1,6 @@
 /*################################################################################
   ##
-  ##   Copyright (C) 2016-2022 Keith O'Hara changed by Suzuki Atsushi 2025
+  ##   Copyright (C) 2016-2022 Keith O'Hara, revised by Suzuki Atsushi
   ##
   ##   This file is part of the OptimLib C++ library.
   ##
@@ -110,14 +110,34 @@ gd_update(const ColVec_t& vals_inp,
 
         case 6: // Adam and AdaMax
         {
+            //double iterAssumedRho_tIsOne = double(gd_settings.iter_max);
+            //double t = double(iter) / double(gd_settings.iter_max) * iterAssumedRho_tIsOne;
+            //double rho_inf = 2.0 / (1.0 - gd_settings.par_adam_beta_2) - 1.0;
+            //double rho_t = rho_inf - 2.0 * t * std::pow(gd_settings.par_adam_beta_2, t) /
+             //   (1.0 - std::pow(gd_settings.par_adam_beta_2, t));
+            //double iterAtRho_tIsFour = (4.0 - rho_inf) / (-2.0 * std::pow(gd_settings.par_adam_beta_2, t)) * (1.0 - std::pow(gd_settings.par_adam_beta_2, t));
+            double r_t =std::min(1.0, std::max(0.0,double(iter)- gd_settings.numTrunc) / double(gd_settings.numWarmUp));// std::sqrt((rho_t - 4.0) * (rho_t - 2.0) * rho_inf
+                         // / ((rho_inf - 4.0) * (rho_inf - 2.0) * rho_t));
+            bool flgAdaptive = false;
+            if (iter > gd_settings.numTrunc) { 
+                flgAdaptive = true;
+            }
+
             adam_vec_m = gd_settings.par_adam_beta_1 * adam_vec_m + (fp_t(1.0) - gd_settings.par_adam_beta_1) * grad_p;
 
             if (gd_settings.ada_max) {
                 adam_vec_v = BMO_MATOPS_MAX(gd_settings.par_adam_beta_2 * adam_vec_v, BMO_MATOPS_ABS(grad_p));
 
                 fp_t adam_step_size = gd_settings.par_step_size / (fp_t(1.0) - std::pow(gd_settings.par_adam_beta_1,iter));
+                if (flgAdaptive) {
+                    direc_out = BMO_MATOPS_ARRAY_DIV_ARRAY((adam_step_size * r_t * adam_vec_m), (BMO_MATOPS_ARRAY_ADD_SCALAR(adam_vec_v, gd_settings.par_ada_norm_term)));
 
-                direc_out = BMO_MATOPS_ARRAY_DIV_ARRAY( (adam_step_size * adam_vec_m), (BMO_MATOPS_ARRAY_ADD_SCALAR(adam_vec_v, gd_settings.par_ada_norm_term)) );
+                }
+                else {
+                    direc_out = gd_settings.par_step_size * adam_vec_m;
+
+                }
+
             } else {
                 fp_t adam_step_size = gd_settings.par_step_size * std::sqrt(fp_t(1.0) - std::pow(gd_settings.par_adam_beta_2,iter)) \
                                      / (fp_t(1.0) - std::pow(gd_settings.par_adam_beta_1,iter));
@@ -125,6 +145,14 @@ gd_update(const ColVec_t& vals_inp,
                 adam_vec_v = gd_settings.par_adam_beta_2 * adam_vec_v + (fp_t(1.0) - gd_settings.par_adam_beta_2) * BMO_MATOPS_POW(grad_p,2);
 
                 direc_out = BMO_MATOPS_ARRAY_DIV_ARRAY( (adam_step_size * adam_vec_m), (BMO_MATOPS_ARRAY_ADD_SCALAR(BMO_MATOPS_SQRT(adam_vec_v), gd_settings.par_ada_norm_term)) );
+                if (flgAdaptive) {
+                    direc_out = BMO_MATOPS_ARRAY_DIV_ARRAY((adam_step_size * r_t * adam_vec_m), (BMO_MATOPS_ARRAY_ADD_SCALAR(BMO_MATOPS_SQRT(adam_vec_v), gd_settings.par_ada_norm_term)));
+
+                }
+                else {
+                    direc_out = gd_settings.par_step_size * adam_vec_m;
+
+                }
             }
 
             break;
@@ -175,7 +203,28 @@ gd_update(const ColVec_t& vals_inp,
             }
             break;
         }
+        //case 9: //RAdam
+        //{
+        //    double rho_inf = 2.0 / (1.0 - gd_settings.par_adam_beta_2) - 1.0;
+        //    adam_vec_v = gd_settings.par_adam_beta_2 * adam_vec_v + (fp_t(1.0) - gd_settings.par_adam_beta_2) * BMO_MATOPS_POW(grad_p, 2);
+        //    adam_vec_m = gd_settings.par_adam_beta_1 * adam_vec_m + (fp_t(1.0) - gd_settings.par_adam_beta_1) * grad_p;
+        //    ColVec_t adam_vec_m_hat = adam_vec_m / (1.0 - std::pow(gd_settings.par_adam_beta_1, double(iter)));
+        //    double rho_t = rho_inf - 2.0 * double(iter) * std::pow(gd_settings.par_adam_beta_2, double(iter)) /
+        //        (1.0 - std::pow(gd_settings.par_adam_beta_2, double(iter)));
+        //    if (rho_t > 4.0) {
+        //        double l_t = std::sqrt(1.0- std::pow(gd_settings.par_adam_beta_2, double(iter)))/BMO_MATOPS_SQRT(adam_vec_v);
+        //        double r_t = std::sqrt((rho_t - 4.0) * (rho_t - 2.0) * rho_inf 
+        //            / ((rho_inf - 4.0) * (rho_inf - 2.0) * rho_t));
 
+        //        direc_out = gd_settings.par_step_size * r_t * l_t * adam_vec_m_hat;
+        //    }
+        //    else {
+        //        direc_out = gd_settings.par_step_size * adam_vec_m_hat;
+        //    }
+
+        //    break;
+
+        //}
         default:
         {
             printf("gd error: unknown value for gd_settings.method");

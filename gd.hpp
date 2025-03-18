@@ -1,6 +1,6 @@
 /*################################################################################
   ##
-  ##   Copyright (C) 2016-2022 Keith O'Hara changed by Suzuki Atsushi 2025
+  ##   Copyright (C) 2016-2022 Keith O'Hara, revised by Suzuki Atsushi
   ##
   ##   This file is part of the OptimLib C++ library.
   ##
@@ -110,6 +110,7 @@ internal::gd_basic_impl(
     
     const uint_t conv_failure_switch = settings.conv_failure_switch;
     const size_t iter_max = settings.iter_max;
+    settings.gd_settings.iter_max = settings.iter_max;
     const fp_t grad_err_tol = settings.grad_err_tol;
     const fp_t rel_sol_change_tol = settings.rel_sol_change_tol;
 
@@ -225,16 +226,18 @@ internal::gd_basic_impl(
         shuffleTipperArray[i] = i;
     }
 
-    int minIter = 3;
-    int averageIter = 3;
+    int minIter = gd_settings.minIterations;
+    int averageIter = gd_settings.averageIterations;
 
-    double objChage = 0.0;
+    double objChange = 1e30;
 
     std::vector<double> objChangeVector(averageIter);
     std::vector<double> relResisChangeVector(averageIter);
 
+    int numOfBreakWhenIncreasing = 0;
+
     while (iter<minIter || (grad_err > grad_err_tol  && iter < iter_max &&
-		objChage>settings_inp->rel_objfn_change_tol && relChangeResisMax>settings_inp->rel_resis_change_tol)) {// add
+		(objChange>settings_inp->rel_objfn_change_tol) && relChangeResisMax>settings_inp->rel_resis_change_tol)) {// add
 		settings_inp->iteration = iter;
         settings_inp->numOfIteration = iter;
 		++iter;
@@ -260,6 +263,17 @@ internal::gd_basic_impl(
 		//	}
 		//}
         //
+        settings_inp->gd_settings.adam_vec_m_p = BMO_MATOPS_ZERO_COLVEC(n_vals);
+        settings_inp->gd_settings.adam_vec_v_p = BMO_MATOPS_ZERO_COLVEC(n_vals);
+        settings_inp->gd_settings.adam_vec_m_p = adam_vec_m;
+        settings_inp->gd_settings.adam_vec_v_p = adam_vec_v;
+
+        ColVec_t grad_p_pre = BMO_MATOPS_ZERO_COLVEC(n_vals);
+        ColVec_t grad_pre = BMO_MATOPS_ZERO_COLVEC(n_vals);
+
+        grad_p_pre = grad_p;
+        grad_pre = grad;
+
 
         ColVec_t d_p = gd_update(x, grad, grad_p, d, box_objfn, opt_data, iter,
                               gd_settings, adam_vec_m, adam_vec_v);
@@ -270,7 +284,6 @@ internal::gd_basic_impl(
 		obj_val_p = obj_val;//add 
 		
 		fp_t par_step_size_p;
-		bool isUsePreStepSize = false;
 
 		for (int i = 0; i < settings_inp->resisVec.size(); i++) {
 			settings_inp->resisVec_p(i) = settings_inp->resisVec(i); //add
@@ -279,21 +292,47 @@ internal::gd_basic_impl(
 
 		obj_val = box_objfn(x_p, &grad_p, opt_data);
 
-		
+        if (obj_val > obj_val_p) {
+            numOfBreakWhenIncreasing++;
+        }
+        else {
+            numOfBreakWhenIncreasing = 0;
+        }
+        if (numOfBreakWhenIncreasing >= gd_settings.numOfBreakWhenIncreasing) {
+            std::cout << "Warning:::Objective Function Increased " << gd_settings.numOfBreakWhenIncreasing << " times!!! Exit This Calculation!!!!!" << std::endl;
+            break;
+        }
 		 
 		if (iter==1 && gd_settings.decreaseFactor > 0.0 && gd_settings.decreaseFactor < 1.0 && obj_val>= obj_val_preItr) { //Add
 			int iterSearchStepSize = 0;
             obj_val_preItr = obj_val;               
 			//while ( (obj_val > obj_val_p&&iterSearchStepSize==0) || (obj_val<obj_val_preItr &&iterSearchStepSize<5)) {
-			while (obj_val <= obj_val_preItr && iterSearchStepSize<10) {
+			while (iterSearchStepSize<10) {
 			//while (obj_val > obj_val_p && obj_val <= obj_val_preItr){
 				std::cout << "Object Function Increasing,, Searching Step Size. Iteration:" << iterSearchStepSize << std::endl;
 
-				adam_vec_m = BMO_MATOPS_ZERO_COLVEC(n_vals);
-				adam_vec_v = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                ColVec_t xPre = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                ColVec_t adam_vec_m_pre = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                ColVec_t adam_vec_v_pre = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                xPre = x_p;
+                grad_p = grad_p_pre;
+                grad = grad_pre;
+                adam_vec_m_pre = adam_vec_m;
+                adam_vec_v_pre = adam_vec_v;
+
+                if (settings_inp->gd_settings.inheritPreviousSettingAdam) { //add
+                    if (settings_inp->gd_settings.isFirstCalcGD == false) {
+                        adam_vec_m = settings_inp->gd_settings.adam_vec_m_p;
+                        adam_vec_v = settings_inp->gd_settings.adam_vec_v_p;
+                    }
+                }
+                else {
+                    adam_vec_m = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                    adam_vec_v = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                }
+				
 				
 				par_step_size_p = gd_settings.par_step_size;
-				isUsePreStepSize = false;
 
 				//if (iterSearchStepSize > 0 || iter == 0) {
 				//	gd_settings.par_step_size *= gd_settings.decreaseFactor;
@@ -311,21 +350,30 @@ internal::gd_basic_impl(
 
 				obj_val = box_objfn(x_p, &grad_p, opt_data);
 
-				if (obj_val >= obj_val_preItr) {
-					isUsePreStepSize = true;
-				}
+                if (obj_val > obj_val_preItr) {
+                    x_p = xPre;
+                    grad_p = grad_p_pre;
+                    grad = grad_pre;
+                    if (settings_inp->gd_settings.inheritPreviousSettingAdam) { //add
+                        if (settings_inp->gd_settings.isFirstCalcGD == false) {
+                            adam_vec_m = settings_inp->gd_settings.adam_vec_m_p;
+                            adam_vec_v = settings_inp->gd_settings.adam_vec_v_p;
+                        }
+                    }
+                    else {
+                        adam_vec_m = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                        adam_vec_v = BMO_MATOPS_ZERO_COLVEC(n_vals);
+                    }
+                    gd_settings.par_step_size = par_step_size_p;
+                    settings_inp->gd_settings.par_step_size = gd_settings.par_step_size;
+                    break;
+                }
 
 				iterSearchStepSize++;
 			}
-			if (isUsePreStepSize) {
-				gd_settings.par_step_size = par_step_size_p;
-				settings_inp->gd_settings.par_step_size = gd_settings.par_step_size;
-			}
+
 		}
-		//else {
-		//	gd_settings.par_step_size = gd_settings.par_step_size*gd_settings.loosenFactor;
-		//	settings_inp->gd_settings.par_step_size = gd_settings.par_step_size;
-		//}
+
 
         if (gd_settings.clip_grad) {
             gradient_clipping(grad_p, gd_settings);
@@ -345,25 +393,34 @@ internal::gd_basic_impl(
 
         OPTIM_GD_TRACE(iter-1, grad_err, rel_sol_change, x, d, grad_p, adam_vec_m, adam_vec_v)
 
-		settings_inp->gd_settings.adam_vec_m_p = BMO_MATOPS_ZERO_COLVEC(n_vals);
-		settings_inp->gd_settings.adam_vec_v_p = BMO_MATOPS_ZERO_COLVEC(n_vals);
-		settings_inp->gd_settings.adam_vec_m_p = adam_vec_m ;
-		settings_inp->gd_settings.adam_vec_v_p = adam_vec_v;
+		
 		settings_inp->gd_settings.isFirstCalcGD = false;
 
-		relChangeResisMax = std::abs((settings_inp->resisVec(0) - settings_inp->resisVec_p(0)) / settings_inp->resisVec(0));
+		/*relChangeResis = std::abs((settings_inp->resisVec(0) - settings_inp->resisVec_p(0)) / settings_inp->resisVec(0));
 		for (int i = 1; i < settings_inp->resisVec.size(); i++) {
 			double relChangeResis= std::abs((settings_inp->resisVec(i) - settings_inp->resisVec_p(i)) / settings_inp->resisVec(i));
-			if (relChangeResis > relChangeResisMax) {
-				relChangeResisMax = relChangeResis;
+			if (relChangeResis > relChangeResis) {
+				relChangeResis = relChangeResis;
 			}
-		}
-		std::cout << "Relative Max Resistivity Change From Previous Iteration:" << relChangeResisMax << std::endl;
+		}*/
 
-        if (iter - 1 < averageIter) {
-            relResisChangeVector[iter - 1] = relChangeResisMax;
-            objChangeVector[iter - 1] = std::abs((obj_val - obj_val_p) / obj_val);
-            objChage = 1e30;
+        relChangeResisMax = std::abs((settings_inp->resisVec(0) - settings_inp->resisVec_p(0)) / settings_inp->resisVec(0));
+        for (int i = 1; i < settings_inp->resisVec.size(); i++) {
+            double relChangeResis = std::abs((settings_inp->resisVec(i) - settings_inp->resisVec_p(i)) / settings_inp->resisVec(i));
+            if (relChangeResis > relChangeResisMax) {
+                relChangeResisMax = relChangeResis;
+            }
+        }
+        std::cout << "Relative Max Resistivity Change From Previous Iteration:" << relChangeResisMax << std::endl;
+        //objChange = std::abs((obj_val - obj_val_p) / obj_val);
+        if (iter - 1 < gd_settings.numTrunc) {
+            objChange = 1e30;
+            relChangeResisMax = 1e30;
+        }
+        else if (iter - 1 - gd_settings.numTrunc < averageIter) {
+            relResisChangeVector[iter - 1 - gd_settings.numTrunc] = relChangeResisMax;
+            objChangeVector[iter - 1 - gd_settings.numTrunc] = std::abs((obj_val - obj_val_p) / obj_val);
+            objChange = 1e30;
             relChangeResisMax = 1e30;
         }
         else {
@@ -380,7 +437,7 @@ internal::gd_basic_impl(
                 aveObjChange += objChangeVector[i];
                 aveSolChange += relResisChangeVector[i];
             }
-            objChage = aveObjChange / averageIter;
+            objChange = aveObjChange / averageIter;
             relChangeResisMax = aveSolChange / averageIter;
         }
 
@@ -419,8 +476,8 @@ internal::gd_basic_impl(
         }
 
         //add setting result to pre
-        *(settings_inp->resultVector_pre) = *(settings_inp->resultVector);
-        *(settings_inp->resultAdjointVector_pre) = *(settings_inp->resultAdjointVector);
+        //*(settings_inp->resultVector_pre) = *(settings_inp->resultVector);
+        //*(settings_inp->resultAdjointVector_pre) = *(settings_inp->resultAdjointVector);
 
     }
 

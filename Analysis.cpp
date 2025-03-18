@@ -3472,30 +3472,30 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 
 	SetSameResistivityToBoundaryCell();
 	cout << "isChangeResis" << isChangeResis << endl;
-	if (isChangeResis == true || initObjVal==0) {
-		CalcSurfaceResistivityElements(); //Update Resistivity
-		time_t start_t = time(NULL);
-		cout << "Update SumNCrossRhoRotHdS.." << endl;
-		CalcSumNCrossRhoRotHdSElements(); //Update coeffs of Matrix
-		time_t end_t = time(NULL);
-		std::cout << "Calculation Time:" << end_t - start_t << " Seconds." << endl;
-		cout << "End Update SumNCrossRhoRotHdS.." << endl;
-		bool isNeededGradient = false;
-		if (grad_out) {
-			dDataMisfitDRho.setZero();
-			if (lambdaDRDRho.size() == 0) {
-				lambdaDRDRho.resize(numOfInvertedResistivityElements);
-			}
-
-			lambdaDRDRho.setZero();
-
-			isNeededGradient = true;
+	//if (isChangeResis == true || initObjVal==0) {
+	CalcSurfaceResistivityElements(); //Update Resistivity
+	time_t start_t = time(NULL);
+	cout << "Update SumNCrossRhoRotHdS.." << endl;
+	CalcSumNCrossRhoRotHdSElements(); //Update coeffs of Matrix
+	time_t end_t = time(NULL);
+	std::cout << "Calculation Time:" << end_t - start_t << " Seconds." << endl;
+	cout << "End Update SumNCrossRhoRotHdS.." << endl;
+	bool isNeededGradient = false;
+	if (grad_out) {
+		dDataMisfitDRho.setZero();
+		if (lambdaDRDRho.size() == 0) {
+			lambdaDRDRho.resize(numOfInvertedResistivityElements);
 		}
 
+		lambdaDRDRho.setZero();
 
-		CalcForward(isNeededGradient);
-
+		isNeededGradient = true;
 	}
+
+
+	CalcForward(isNeededGradient);
+
+	//}
 
 	invSettings->ReadManualSettingData(&settings);
 

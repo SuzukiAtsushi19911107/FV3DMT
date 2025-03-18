@@ -1,7 +1,7 @@
 /*################################################################################
   ##
-  ##   Copyright (C) 2016-2022 Keith O'Hara changed by Suzuki Atsushi 2025
-  ##
+  ##   Copyright (C) 2016-2022 Keith O'Hara, revised by Suzuki Atsushi
+  ##   
   ##   This file is part of the OptimLib C++ library.
   ##
   ##   Licensed under the Apache License, Version 2.0 (the "License");
@@ -93,8 +93,14 @@ struct gd_settings_t
 	bool inheritPreviousSettingAdam;
 	bool isFirstCalcGD = true;
     int minibatches = 1;
+    int numOfBreakWhenIncreasing = 5;
 	ColVec_t adam_vec_m_p;
 	ColVec_t adam_vec_v_p;
+    int iter_max;
+    int numWarmUp = 10;
+    int minIterations = 10;
+    int averageIterations = 5;
+    int numTrunc = 5;
 };
 
 // L-BFGS
@@ -265,8 +271,8 @@ struct algo_settings_t
 
     ColVec_comp_t* resultVector;
     ColVec_comp_t* resultAdjointVector;
-    ColVec_comp_t* resultVector_pre;
-    ColVec_comp_t* resultAdjointVector_pre;
+    //ColVec_comp_t* resultVector_pre;
+    //ColVec_comp_t* resultAdjointVector_pre;
     // bounds
 
     bool vals_bound = false;

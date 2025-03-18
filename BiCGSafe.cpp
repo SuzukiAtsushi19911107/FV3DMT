@@ -1502,7 +1502,7 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
 
 
             if (!isFinite) {
-                m_iters = maxIters;
+                iters[i] = maxIters;
                 break;
             }
 
@@ -1514,12 +1514,13 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
                 if (!(m_lastRelativeSolChangeVector[i] > tol && iters[i] < maxIters)) {
                     finishedEachSols[i] = true;   
                 }
+                if (!(m_errorVector[i] > tol && iters[i] < maxIters)) {
+                    finishedEachSols[i] = true;
+                }
+
             }
 
-            if (!(m_errorVector[i] > tol && iters[i] < maxIters)) {
-                finishedEachSols[i] = true;
-            }
-
+            
 
             restart[i] = false;
 
@@ -1541,9 +1542,6 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
 
             }
 
-            if (finishedEachSols[i]) {
-                continue;
-            }
             precond.solve(r[i], precondr[i]);
             //if (useMultiGrid) {
             //    precond_multi.solve(r[i], precondr[i]);
@@ -1557,16 +1555,12 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
             //precondr[i] = precond.solve(r[i]);
             //matKpr[i] = *mat * precondr[i];
 
-            if (finishedEachSols[i]) {
-                continue;
-            }
+
             p[i] = precondr[i] + beta[i] * (p[i] - u[i]);
             Ap[i] = matKpr[i] + beta[i] * (Ap[i] - matu[i]);
             alpha[i] = rho[i] / r0star[i].dot(Ap[i]);
 
-            if (finishedEachSols[i]) {
-                continue;
-            }
+
             if (iters[i] == 0 || restart[i] == true) {
                 psi[i] = matKpr[i].dot(r[i]) / matKpr[i].dot(matKpr[i]);
                 eta[i] = 0.0;
