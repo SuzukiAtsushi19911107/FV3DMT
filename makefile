@@ -1,10 +1,10 @@
-CC = g++
-FLAGS = -fopenmp -std=c++17   -O3 -mtune=native -march=native -mfpmath=both
+CC = icpx
+FLAGS = -qopenmp -O2 -xhost -inline-forceinline
 INCB  = -I C:\boost\build\include\boost-1_88
-INCE  = -I C:\Users\xxxxx\Desktop\MT_INV\lib\eigen-3.4.0
-INCO  = -I C:\Users\xxxxx\Desktop\MT_INV\lib\optimlib\header_only_version
-INCK  = -I C:\Users\xxxxx\Desktop\MT_INV\lib\kv-0.4.58
-OUT   = MT_INV.exe
+INCE  = -I C:\Users\443253\Desktop\MT_INV\lib\eigen-3.4.0
+INCO  = -I C:\Users\443253\Desktop\MT_INV\lib\optimlib\header_only_version
+INCK  = -I C:\Users\443253\Desktop\MT_INV\lib\kv-0.4.58
+OUT   = MT_INV.out
 MT_INV: MT.o Analysis.o BiCGSafe.o Boundary.o DivergenceCorrection.o Element.o Function.o FineGrainedILU.o InitialDistData.o InitialResisData.o InvSettings.o LocationCalcSettings.o ObsData.o Output.o  Property.o ReadData.o Node.o UncertaintyAnalysis.o UnstructuredElement.o
 	$(CC) -o $(OUT)  MT.o Analysis.o BiCGSafe.o Boundary.o DivergenceCorrection.o Element.o Function.o FineGrainedILU.o InitialDistData.o InitialResisData.o InvSettings.o LocationCalcSettings.o ObsData.o Output.o  Property.o ReadData.o Node.o UncertaintyAnalysis.o UnstructuredElement.o $(INCB) $(INCE) $(INCO) $(INCK)  $(FLAGS)
 
