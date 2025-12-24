@@ -11,16 +11,11 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <Eigen/Sparse>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-
+#include "Element.h"
 using namespace std;
-namespace LocationCalcSettings {
-	class LocationCalcSettings {
+namespace FFTSensitivityAnalysis {
+	class FFTSensitivityAnalysis {
 	public:
-		bool isCalc = false;
-		std::string locationFile ="";
-		std::string resistivityFile = "";
-		double widthImpedance = 1.01;
-		int numOfSplit = 1;
-		double ratioResistivity = 0.1;
+		
 	};
 }

@@ -16,6 +16,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include "DivergenceCorrection.h"
 #include <omp.h>
 #include "Output.h"
+#define EIGEN_DONT_PARALLELIZE
 using namespace std;
 
 inline std::complex<double> BiCGSafe::BiCGSafe::dot(Eigen::VectorXcd& a, Eigen::VectorXcd& b) {
@@ -1349,339 +1350,526 @@ bool BiCGSafe::BiCGSafe::solve(const Eigen::SparseMatrix<double, Eigen::RowMajor
     //https://www.jstage.jst.go.jp/article/jsces/2005/0/2005_0_20050028/_pdf
     //BiCGSafe method based on minimization of associate residual
     //線形方程式の反復解法 丸善
+    //Optimized by chatGPT
+//    ofstream outputfile;
+//    outputfile.open("solverLog_" + to_string(omega) + ".txt", std::ios::out);
+//    outputfile << "numOfIterations polarization relSolChange_1 relSolChange_2 error_1 error_2" << endl;
+//
+//
+//    bool isConverged = false;
+//
+//
+//    int maxIters = m_maxIteration;
+//
+//    int minIters = 10;
+//
+//
+//    //int iter = 0;
+//    vector<int> iters(numOfSols);
+//    for (int i = 0; i < numOfSols; i++) {
+//        iters[i] = 0;
+//    }
+//    m_iters = 0;
+//
+//
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        r0star[i].setZero();
+//        x0star[i].setZero();
+//    }
+//
+//
+//    /*const int seed = 12345;
+//    std::srand(seed);
+//    double randMax = RAND_MAX;
+//    for (int i = 0; i < numOfSols; i++) {
+//        for (int j = 0; j < r0star[i].size(); j++) {
+//            r0star[i].coeffRef(j) = std::rand() / randMax;
+//            r0star[i].coeffRef(j).imag(std::rand() / randMax);
+//        }
+//    }*/
+//
+//    vector<Eigen::VectorXcd> r0norm(numOfSols);
+//    for (int i = 0; i < numOfSols; i++) {
+//        r[i].setZero();
+//        r[i] = (*rhs)[i] - *matR * ((*x)[i]) - *matI * ((*x)[i]);
+//
+//        r0norm[i] = r[i];
+//
+//        r0star[i] = r[i];
+//        r0_sqnorm[i] = r[i].squaredNorm();
+//
+//        x0[i].setZero();
+//        x0[i] = (*x)[i];
+//
+//        rhs_sqnorm[i] = (*rhs)[i].squaredNorm();
+//        if (rhs_sqnorm[i] == 0)
+//        {
+//            (*x)[i].setZero();
+//
+//        }
+//
+//        x_p[i].setZero();
+//        x_p[i] = (*x)[i];
+//    }
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        alpha[i] = 0.0;
+//        w[i] = 1.0;
+//    }
+//
+//    double eps2 = 1e-30;
+//
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        relatedSolChange[i] = 1e30;
+//    }
+//    double eps = 1e-30;
+//
+//
+//    //Eigen::VectorXcd p = r;
+//
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        m_lastRelativeSolChangeVector[i] = std::pow(((*x)[i] - x_p[i]).squaredNorm() / (x_p[i].squaredNorm() + eps2), 0.5);
+//        m_errorVector[i] = std::pow((*matR * (*x)[i] + *matI * (*x)[i] - (*rhs)[i]).squaredNorm() / (*rhs)[i].squaredNorm(), 0.5);
+//    }
+//    m_iters = 0;
+//
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        v[i].setZero();
+//
+//        p[i].setZero();
+//
+//        u[i].setZero();
+//
+//        y[i].setZero();
+//
+//        z[i].setZero();
+//
+//        Ap[i].setZero();
+//
+//        precondr[i].setZero();
+//
+//        r_p[i].setZero();
+//
+//        matKpr[i].setZero();
+//
+//        matu[i].setZero();
+//
+//        psiApPlusEtaY[i].setZero();
+//    }
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        beta[i] = 0.0;
+//    }
+//
+//
+//
+//    for (int i = 0; i < numOfSols; i++) {
+//        rho[i] = r0star[i].dot(r[i]);
+//        rho_old[i] = rho[i];
+//    }
+//
+//
+// 
+//
+//    vector<bool>finishedEachSols(numOfSols);
+//    for (int i = 0; i < numOfSols; i++) {
+//        finishedEachSols[i] = false;
+//    }
+//#pragma omp parallel for
+//    for (int i = 0; i < numOfSols; i++) {
+//        while (true) {
+//            //while (m_lastRelativeSolChange == 0.0 || (m_lastRelativeSolChange > tol && iter < maxIters) || minIters > iter) {
+//            //cout<<iter<<" " << m_errorVector[0] << " " << m_errorVector[1] << " " << m_lastRelativeSolChangeVector[0] << " " << m_lastRelativeSolChangeVector[1] << endl;
+//
+//            outputfile<<iters[i]<<" " << i  << " " << m_lastRelativeSolChangeVector[i] << " " << m_errorVector[i] << endl;
+//
+//
+//
+//            bool isFinite = true;
+//            bool chkfinite = isfinite(m_errorVector[i]);
+//            isFinite = isFinite * chkfinite;
+//            chkfinite = isfinite(m_lastRelativeSolChangeVector[i]);
+//            isFinite = isFinite * chkfinite;
+//
+//
+//            if (!isFinite) {
+//                iters[i] = maxIters;
+//                break;
+//            }
+//
+//            
+//
+//
+//
+//            if (iters[i] != 0) {
+//                if (!(m_lastRelativeSolChangeVector[i] > tol && iters[i] < maxIters)) {
+//                    finishedEachSols[i] = true;   
+//                }
+//                if (!(m_errorVector[i] > tol && iters[i] < maxIters)) {
+//                    finishedEachSols[i] = true;
+//                }
+//
+//            }
+//
+//            
+//
+//            restart[i] = false;
+//
+//
+//
+//            if (finishedEachSols[i]) {
+//                break;
+//            }
+//            if (abs(rho[i]) < eps2 * r0_sqnorm[i])
+//            {
+//                // The new residual vector became too orthogonal to the arbitrarily chosen direction r0
+//                // Let's restart with a new r0:
+//                r[i] = (*rhs)[i] - *matR * (*x)[i] - *matI * (*x)[i];
+//                r0star[i] = r[i];
+//                rho[i] = r0star[i].dot(r[i]);
+//
+//                restart[i] = true;
+//                beta[i] = 0.0;
+//
+//            }
+//
+//            precond.solve(r[i], precondr[i]);
+//            //if (useMultiGrid) {
+//            //    precond_multi.solve(r[i], precondr[i]);
+//            //}
+//            //else {
+//            //    precond.solve(r[i], precondr[i]);
+//            //}
+//
+//            matKpr[i] = *matR * precondr[i] + *matI * precondr[i];
+//
+//            //precondr[i] = precond.solve(r[i]);
+//            //matKpr[i] = *mat * precondr[i];
+//
+//
+//            p[i] = precondr[i] + beta[i] * (p[i] - u[i]);
+//            Ap[i] = matKpr[i] + beta[i] * (Ap[i] - matu[i]);
+//            alpha[i] = rho[i] / r0star[i].dot(Ap[i]);
+//
+//
+//            if (iters[i] == 0 || restart[i] == true) {
+//                psi[i] = matKpr[i].dot(r[i]) / matKpr[i].dot(matKpr[i]);
+//                eta[i] = 0.0;
+//            }
+//            
+//            else {
+//                std::complex<double> bb;
+//                std::complex<double> ca;
+//                std::complex<double> ba;
+//                std::complex<double> cb;
+//                std::complex<double> cc;
+//                std::complex<double> bc;
+//
+//                bb = y[i].dot(y[i]);
+//                ca = matKpr[i].dot(r[i]);
+//                ba = y[i].dot(r[i]);
+//                cb = matKpr[i].dot(y[i]);
+//                cc = matKpr[i].dot(matKpr[i]);
+//                bc = std::conj(cb);
+//
+//                psi[i] = (bb * ca - ba * cb) /
+//                    (cc * bb - bc * cb);
+//
+//                eta[i] = (cc * ba - bc * ca) /
+//                    (cc * bb - bc * cb);
+//
+//            }
+//            
+//            psiApPlusEtaY[i] = psi[i] * Ap[i] + eta[i] * y[i];
+//            
+//            Eigen::VectorXcd tmp{ matR->rows() };
+//            precond.solve(psiApPlusEtaY[i], tmp);
+//
+//            /*if (useMultiGrid) {
+//                precond_multi.solve(psiApPlusEtaY[i], tmp);
+//            }
+//            else {
+//                precond.solve(psiApPlusEtaY[i], tmp);
+//            }*/
+//            u[i] = tmp + (eta[i] * beta[i]) * u[i];
+//            z[i] = psi[i] * precondr[i] + eta[i] * z[i] - alpha[i] * u[i];
+//
+//
+//
+//            matu[i] = *matR * u[i] + *matI * u[i];
+//
+//
+//            y[i] = psi[i] * matKpr[i] + eta[i] * y[i] - alpha[i] * matu[i];
+//            (*x)[i] = (*x)[i] + alpha[i] * p[i] + z[i];
+//
+//            r_p[i] = r[i];
+//
+//            rho_old[i] = rho[i];
+//
+//            r[i] = r[i] - alpha[i] * Ap[i] - y[i];
+//
+//            rho[i] = r0star[i].dot(r[i]);
+//
+//            beta[i] = alpha[i] / psi[i] * rho[i] / rho_old[i];
+//
+//            m_lastRelativeSolChangeVector[i] = std::pow(((*x)[i] - x_p[i]).squaredNorm() / (x_p[i].squaredNorm() + eps2), 0.5);
+//            x_p[i] = (*x)[i];
+//
+//            m_errorVector[i] = std::pow(r[i].squaredNorm() / rhs_sqnorm[i], 0.5);
+//
+//            double rmax = 0;
+//            int argRmax = 0;
+//            for (int j = 0; j < r[i].size(); j++) {
+//                if (rmax < abs(r[i].coeff(j) / r0norm[i].coeff(j)) && r0norm[i].coeff(j) != 0.0) {
+//                    rmax = abs(r[i].coeff(j) / r0norm[i].coeff(j));
+//                    argRmax = j;
+//                }
+//            }
+//            /*Element::Element* element = (*calcElementsVector)[(*solverToOriginal)[argRmax]/3];
+//            cout << "Direc,RMax,elementID,XYZ,Resistivity,preR:" << i << " " << rmax << " " << element->ID<<" "<< (*solverToOriginal)[argRmax] % 3 << " " << element->resistivity
+//            << " " << abs(r0norm[i].coeff(argRmax)) << endl;
+//            double rmin = 1e30;
+//            int argRmin = 0;
+//            for (int j = 0; j < r[i].size(); j++) {
+//                if (rmin > abs(r[i].coeff(j) / r0norm[i].coeff(j)) && r0norm[i].coeff(j)!=0.0) {
+//                    rmin = abs(r[i].coeff(j) / r0norm[i].coeff(j));
+//                    argRmin = j;
+//                }
+//            }
+//            element = (*calcElementsVector)[(*solverToOriginal)[argRmin] / 3];
+//            cout << "Direc,RMin,elementID,XYZ,Resistivity,preR:" << i << " " << rmin << " " << element->ID << " " << (*solverToOriginal)[argRmin] % 3 << " " << element->resistivity
+//                <<" "<<abs(r0norm[i].coeff(argRmin)) << endl;
+//
+//            r0norm[i] = r[i];*/
+//            iters[i]++;
+//
+//        }
+//
+//
+//            
+//    }
+//    m_error = 0.0;
+//    m_lastRelativeSolChange = 0.0;
+//    m_iters = 0;
+//    for (int i = 0; i < numOfSols; i++) {
+//        
+//        if (m_lastRelativeSolChangeVector[i] > m_lastRelativeSolChange) {
+//            m_lastRelativeSolChange = m_lastRelativeSolChangeVector[i];
+//        }
+//        if (iters[i] > m_iters) {
+//            m_iters = iters[i];
+//        }
+//        if (std::pow(r[i].squaredNorm() / (*rhs)[i].squaredNorm(), 0.5) > m_error) {
+//            m_error = std::pow(r[i].squaredNorm() / (*rhs)[i].squaredNorm(), 0.5);
+//        }
+//        rReturn[i] = r[i];
+//        //(*x)[i] = precond.RecoverSolution((*x)[i]);
+//    }
+//
+//    outputfile.close();
+//
+//    if (m_iters == maxIters) {
+//        return false;
+//    }
+//    else {
+//        return true;
+//    }
+//    //return;
 
-    ofstream outputfile;
-    outputfile.open("solverLog_" + to_string(omega) + ".txt", std::ios::out);
-    outputfile << "numOfIterations polarization relSolChange_1 relSolChange_2 error_1 error_2" << endl;
+    const int nrows = matR->rows();
+    const double eps2 = 1e-30;
 
+    // matI は対角行列：対角ベクトルを一度だけ抽出
+    Eigen::VectorXcd diagI = matI->diagonal();
 
-    bool isConverged = false;
+    // Av = (matR + matI_diag) * v を割り当て無しで計算
+    auto apply_A = [&](const Eigen::VectorXcd& v,
+        Eigen::VectorXcd& out,
+        Eigen::VectorXcd& tmp) {
+            // out = matI * v  (対角なので要素ごとの積)
+            out = diagI.cwiseProduct(v);
+            // tmp = matR * v  (実×複素 → 複素ベクトル)
+            tmp.noalias() = (*matR) * v;
+            // out += tmp
+            out += tmp;
+        };
 
-
-    int maxIters = m_maxIteration;
-
-    int minIters = 10;
-
-
-    //int iter = 0;
-    vector<int> iters(numOfSols);
-    for (int i = 0; i < numOfSols; i++) {
-        iters[i] = 0;
-    }
+    const int maxIters = m_maxIteration;
+    std::vector<int> iters(numOfSols, 0);
     m_iters = 0;
-
-
-
 
     for (int i = 0; i < numOfSols; i++) {
         r0star[i].setZero();
         x0star[i].setZero();
     }
 
+    std::vector<Eigen::VectorXcd> r0norm(numOfSols);
 
-    /*const int seed = 12345;
-    std::srand(seed);
-    double randMax = RAND_MAX;
-    for (int i = 0; i < numOfSols; i++) {
-        for (int j = 0; j < r0star[i].size(); j++) {
-            r0star[i].coeffRef(j) = std::rand() / randMax;
-            r0star[i].coeffRef(j).imag(std::rand() / randMax);
+    // 初期化
+    {
+        Eigen::VectorXcd tmp(nrows), Ax(nrows);
+        for (int i = 0; i < numOfSols; i++) {
+            // r = rhs - A*x
+            apply_A((*x)[i], Ax, tmp);
+            r[i] = (*rhs)[i] - Ax;
+
+            r0norm[i] = r[i];
+            r0star[i] = r[i];
+            r0_sqnorm[i] = r[i].squaredNorm();
+
+            x0[i] = (*x)[i];
+            rhs_sqnorm[i] = (*rhs)[i].squaredNorm();
+            if (rhs_sqnorm[i] == 0.0) (*x)[i].setZero();
+            x_p[i] = (*x)[i];
+
+            // 初期評価
+            m_lastRelativeSolChangeVector[i] =
+                std::sqrt(((*x)[i] - x_p[i]).squaredNorm() / (x_p[i].squaredNorm() + eps2));
+            m_errorVector[i] =
+                std::sqrt((Ax - (*rhs)[i]).squaredNorm() / (rhs_sqnorm[i] + eps2));
         }
-    }*/
-
-    vector<Eigen::VectorXcd> r0norm(numOfSols);
-    for (int i = 0; i < numOfSols; i++) {
-        r[i].setZero();
-        r[i] = (*rhs)[i] - *matR * ((*x)[i]) - *matI * ((*x)[i]);
-
-        r0norm[i] = r[i];
-
-        r0star[i] = r[i];
-        r0_sqnorm[i] = r[i].squaredNorm();
-
-        x0[i].setZero();
-        x0[i] = (*x)[i];
-
-        rhs_sqnorm[i] = (*rhs)[i].squaredNorm();
-        if (rhs_sqnorm[i] == 0)
-        {
-            (*x)[i].setZero();
-
-        }
-
-        x_p[i].setZero();
-        x_p[i] = (*x)[i];
-    }
-
-
-    for (int i = 0; i < numOfSols; i++) {
-        alpha[i] = 0.0;
-        w[i] = 1.0;
-    }
-
-    double eps2 = 1e-30;
-
-
-
-    for (int i = 0; i < numOfSols; i++) {
-        relatedSolChange[i] = 1e30;
-    }
-    double eps = 1e-30;
-
-
-    //Eigen::VectorXcd p = r;
-
-
-
-    for (int i = 0; i < numOfSols; i++) {
-        m_lastRelativeSolChangeVector[i] = std::pow(((*x)[i] - x_p[i]).squaredNorm() / (x_p[i].squaredNorm() + eps2), 0.5);
-        m_errorVector[i] = std::pow((*matR * (*x)[i] + *matI * (*x)[i] - (*rhs)[i]).squaredNorm() / (*rhs)[i].squaredNorm(), 0.5);
     }
     m_iters = 0;
 
-
-
+    // 作業領域初期化
     for (int i = 0; i < numOfSols; i++) {
-        v[i].setZero();
-
-        p[i].setZero();
-
-        u[i].setZero();
-
-        y[i].setZero();
-
-        z[i].setZero();
-
-        Ap[i].setZero();
-
-        precondr[i].setZero();
-
-        r_p[i].setZero();
-
-        matKpr[i].setZero();
-
-        matu[i].setZero();
-
+        v[i].setZero(); p[i].setZero(); u[i].setZero();
+        y[i].setZero(); z[i].setZero(); Ap[i].setZero();
+        precondr[i].setZero(); r_p[i].setZero();
+        matKpr[i].setZero();  matu[i].setZero();
         psiApPlusEtaY[i].setZero();
-    }
-
-
-    for (int i = 0; i < numOfSols; i++) {
         beta[i] = 0.0;
-    }
-
-
-
-    for (int i = 0; i < numOfSols; i++) {
+        alpha[i] = 0.0; w[i] = 1.0;
         rho[i] = r0star[i].dot(r[i]);
         rho_old[i] = rho[i];
+        relatedSolChange[i] = 1e30;
+        restart[i] = false;
     }
 
+    std::vector<bool> finishedEachSols(numOfSols, false);
 
- 
+#pragma omp parallel for
+    for (int i = 0; i < numOfSols; i++) {
+        Eigen::VectorXcd tmp(nrows), Av(nrows); // スレッド専有バッファ
 
-    vector<bool>finishedEachSols(numOfSols);
-    for (int i = 0; i < numOfSols; i++) {
-        finishedEachSols[i] = false;
-    }
-//#pragma omp parallel for
-    for (int i = 0; i < numOfSols; i++) {
         while (true) {
-            //while (m_lastRelativeSolChange == 0.0 || (m_lastRelativeSolChange > tol && iter < maxIters) || minIters > iter) {
-            //cout<<iter<<" " << m_errorVector[0] << " " << m_errorVector[1] << " " << m_lastRelativeSolChangeVector[0] << " " << m_lastRelativeSolChangeVector[1] << endl;
-
-            outputfile<<iters[i]<<" " << i  << " " << m_lastRelativeSolChangeVector[i] << " " << m_errorVector[i] << endl;
-
-
-
-            bool isFinite = true;
-            bool chkfinite = isfinite(m_errorVector[i]);
-            isFinite = isFinite * chkfinite;
-            chkfinite = isfinite(m_lastRelativeSolChangeVector[i]);
-            isFinite = isFinite * chkfinite;
-
-
-            if (!isFinite) {
+            if (!(std::isfinite(m_errorVector[i]) &&
+                std::isfinite(m_lastRelativeSolChangeVector[i]))) {
                 iters[i] = maxIters;
                 break;
             }
 
-            
-
-
-
             if (iters[i] != 0) {
-                if (!(m_lastRelativeSolChangeVector[i] > tol && iters[i] < maxIters)) {
-                    finishedEachSols[i] = true;   
-                }
-                if (!(m_errorVector[i] > tol && iters[i] < maxIters)) {
+                if (!(m_lastRelativeSolChangeVector[i] > tol && iters[i] < maxIters))
                     finishedEachSols[i] = true;
-                }
-
+                if (!(m_errorVector[i] > tol && iters[i] < maxIters))
+                    finishedEachSols[i] = true;
             }
+            if (finishedEachSols[i]) break;
 
-            
-
-            restart[i] = false;
-
-
-
-            if (finishedEachSols[i]) {
-                break;
-            }
-            if (abs(rho[i]) < eps2 * r0_sqnorm[i])
-            {
-                // The new residual vector became too orthogonal to the arbitrarily chosen direction r0
-                // Let's restart with a new r0:
-                r[i] = (*rhs)[i] - *matR * (*x)[i] - *matI * (*x)[i];
+            if (std::abs(rho[i]) < 1e-30 * r0_sqnorm[i]) {
+                // 再スタート: r = rhs - A*x
+                apply_A((*x)[i], Av, tmp);
+                r[i] = (*rhs)[i] - Av;
                 r0star[i] = r[i];
                 rho[i] = r0star[i].dot(r[i]);
-
                 restart[i] = true;
                 beta[i] = 0.0;
-
+            }
+            else {
+                restart[i] = false;
             }
 
+            // 前処理
             precond.solve(r[i], precondr[i]);
-            //if (useMultiGrid) {
-            //    precond_multi.solve(r[i], precondr[i]);
-            //}
-            //else {
-            //    precond.solve(r[i], precondr[i]);
-            //}
 
-            matKpr[i] = *matR * precondr[i] + *matI * precondr[i];
+            // matKpr = A * (M^{-1} r)
+            apply_A(precondr[i], matKpr[i], tmp);
 
-            //precondr[i] = precond.solve(r[i]);
-            //matKpr[i] = *mat * precondr[i];
-
-
+            // 更新
             p[i] = precondr[i] + beta[i] * (p[i] - u[i]);
             Ap[i] = matKpr[i] + beta[i] * (Ap[i] - matu[i]);
+
             alpha[i] = rho[i] / r0star[i].dot(Ap[i]);
 
-
-            if (iters[i] == 0 || restart[i] == true) {
-                psi[i] = matKpr[i].dot(r[i]) / matKpr[i].dot(matKpr[i]);
+            if (iters[i] == 0 || restart[i]) {
+                const auto num = matKpr[i].dot(r[i]);
+                const auto den = matKpr[i].dot(matKpr[i]);
+                psi[i] = num / den;
                 eta[i] = 0.0;
             }
-            
             else {
-                std::complex<double> bb;
-                std::complex<double> ca;
-                std::complex<double> ba;
-                std::complex<double> cb;
-                std::complex<double> cc;
-                std::complex<double> bc;
+                const auto bb = y[i].dot(y[i]);
+                const auto ca = matKpr[i].dot(r[i]);
+                const auto ba = y[i].dot(r[i]);
+                const auto cb = matKpr[i].dot(y[i]);
+                const auto cc = matKpr[i].dot(matKpr[i]);
+                const auto bc = std::conj(cb);
 
-                bb = y[i].dot(y[i]);
-                ca = matKpr[i].dot(r[i]);
-                ba = y[i].dot(r[i]);
-                cb = matKpr[i].dot(y[i]);
-                cc = matKpr[i].dot(matKpr[i]);
-                bc = std::conj(cb);
-
-                psi[i] = (bb * ca - ba * cb) /
-                    (cc * bb - bc * cb);
-
-                eta[i] = (cc * ba - bc * ca) /
-                    (cc * bb - bc * cb);
-
+                psi[i] = (bb * ca - ba * cb) / (cc * bb - bc * cb);
+                eta[i] = (cc * ba - bc * ca) / (cc * bb - bc * cb);
             }
-            
+
             psiApPlusEtaY[i] = psi[i] * Ap[i] + eta[i] * y[i];
-            
-            Eigen::VectorXcd tmp{ matR->rows() };
-            precond.solve(psiApPlusEtaY[i], tmp);
 
-            /*if (useMultiGrid) {
-                precond_multi.solve(psiApPlusEtaY[i], tmp);
-            }
-            else {
-                precond.solve(psiApPlusEtaY[i], tmp);
-            }*/
-            u[i] = tmp + (eta[i] * beta[i]) * u[i];
+            // 前処理適用
+            precond.solve(psiApPlusEtaY[i], Av);           // Av を一時として再利用
+            u[i] = Av + (eta[i] * beta[i]) * u[i];
+
             z[i] = psi[i] * precondr[i] + eta[i] * z[i] - alpha[i] * u[i];
 
-
-
-            matu[i] = *matR * u[i] + *matI * u[i];
-
+            // matu = A * u
+            apply_A(u[i], matu[i], tmp);
 
             y[i] = psi[i] * matKpr[i] + eta[i] * y[i] - alpha[i] * matu[i];
-            (*x)[i] = (*x)[i] + alpha[i] * p[i] + z[i];
-
-            r_p[i] = r[i];
+            (*x)[i] += alpha[i] * p[i] + z[i];
 
             rho_old[i] = rho[i];
-
             r[i] = r[i] - alpha[i] * Ap[i] - y[i];
 
             rho[i] = r0star[i].dot(r[i]);
+            beta[i] = (alpha[i] / psi[i]) * (rho[i] / rho_old[i]);
 
-            beta[i] = alpha[i] / psi[i] * rho[i] / rho_old[i];
-
-            m_lastRelativeSolChangeVector[i] = std::pow(((*x)[i] - x_p[i]).squaredNorm() / (x_p[i].squaredNorm() + eps2), 0.5);
+            // 収束評価（sqrt）
+            const double denom = x_p[i].squaredNorm() + eps2;
+            m_lastRelativeSolChangeVector[i] =
+                std::sqrt(((*x)[i] - x_p[i]).squaredNorm() / denom);
             x_p[i] = (*x)[i];
 
-            m_errorVector[i] = std::pow(r[i].squaredNorm() / rhs_sqnorm[i], 0.5);
+            m_errorVector[i] =
+                std::sqrt(r[i].squaredNorm() / (rhs_sqnorm[i] + eps2));
 
-            double rmax = 0;
-            int argRmax = 0;
-            for (int j = 0; j < r[i].size(); j++) {
-                if (rmax < abs(r[i].coeff(j) / r0norm[i].coeff(j)) && r0norm[i].coeff(j) != 0.0) {
-                    rmax = abs(r[i].coeff(j) / r0norm[i].coeff(j));
-                    argRmax = j;
-                }
-            }
-            /*Element::Element* element = (*calcElementsVector)[(*solverToOriginal)[argRmax]/3];
-            cout << "Direc,RMax,elementID,XYZ,Resistivity,preR:" << i << " " << rmax << " " << element->ID<<" "<< (*solverToOriginal)[argRmax] % 3 << " " << element->resistivity
-            << " " << abs(r0norm[i].coeff(argRmax)) << endl;
-            double rmin = 1e30;
-            int argRmin = 0;
-            for (int j = 0; j < r[i].size(); j++) {
-                if (rmin > abs(r[i].coeff(j) / r0norm[i].coeff(j)) && r0norm[i].coeff(j)!=0.0) {
-                    rmin = abs(r[i].coeff(j) / r0norm[i].coeff(j));
-                    argRmin = j;
-                }
-            }
-            element = (*calcElementsVector)[(*solverToOriginal)[argRmin] / 3];
-            cout << "Direc,RMin,elementID,XYZ,Resistivity,preR:" << i << " " << rmin << " " << element->ID << " " << (*solverToOriginal)[argRmin] % 3 << " " << element->resistivity
-                <<" "<<abs(r0norm[i].coeff(argRmin)) << endl;
-
-            r0norm[i] = r[i];*/
-            iters[i]++;
-
+            ++iters[i];
         }
-
-
-            
     }
+
+    // 代表値に集約
     m_error = 0.0;
     m_lastRelativeSolChange = 0.0;
     m_iters = 0;
     for (int i = 0; i < numOfSols; i++) {
-        
-        if (m_lastRelativeSolChangeVector[i] > m_lastRelativeSolChange) {
+        if (m_lastRelativeSolChangeVector[i] > m_lastRelativeSolChange)
             m_lastRelativeSolChange = m_lastRelativeSolChangeVector[i];
-        }
-        if (iters[i] > m_iters) {
+        if (iters[i] > m_iters)
             m_iters = iters[i];
-        }
-        if (std::pow(r[i].squaredNorm() / (*rhs)[i].squaredNorm(), 0.5) > m_error) {
-            m_error = std::pow(r[i].squaredNorm() / (*rhs)[i].squaredNorm(), 0.5);
-        }
+
+        const double err_i =
+            std::sqrt(r[i].squaredNorm() / ((*rhs)[i].squaredNorm() + eps2));
+        if (err_i > m_error) m_error = err_i;
+
         rReturn[i] = r[i];
-        //(*x)[i] = precond.RecoverSolution((*x)[i]);
+        // (*x)[i] = precond.RecoverSolution((*x)[i]); // 必要なら
     }
 
-    outputfile.close();
-
-    if (m_iters == maxIters) {
-        return false;
-    }
-    else {
-        return true;
-    }
-    //return;
+    return (m_iters != maxIters);
 }

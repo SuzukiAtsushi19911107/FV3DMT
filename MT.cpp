@@ -2,6 +2,7 @@
 FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
 */
 #pragma once
+
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 #include "optim.hpp"
 #include <sys/stat.h>
@@ -15,7 +16,9 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <kv/complex.hpp>
 #include <boost/version.hpp>
 #include <omp.h>
-
+#ifdef _CRTDBG_MAP_ALLOC
+# error "Leak detection is on in Release!"
+#endif
 
 //template <class T> ub::vector<T> f(double b, ub::vector<T>& x,double a) {
 //	ub::vector<T> y(2);
@@ -90,12 +93,12 @@ int main(int args, char* argv[])
 	//omp_set_num_threads(std::min(omp_get_max_threads(), int(analysis->boundary->omega.size())));
 	std::cout << "omp_get_max_threads:" << omp_get_max_threads() << std::endl;
 
-	//if (omp_get_max_threads() >= 2 * analysis->boundary->omega.size()) {
-	//	omp_set_nested(1);
-	//}
-	//else {
+	if (omp_get_max_threads() >= 2 * analysis->boundary->omega.size()) {
+		omp_set_nested(1);
+	}
+	else {
 		omp_set_nested(0);
-	//}
+	}
 
 	if (forwardCalc == true) {
 		cout << "Calculation Type:Forward Calculation Mode" << endl;

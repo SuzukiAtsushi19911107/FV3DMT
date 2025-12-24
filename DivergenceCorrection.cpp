@@ -2,6 +2,7 @@
 FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
 */
 #pragma once
+
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 #include "optim.hpp"
 #include <iostream>

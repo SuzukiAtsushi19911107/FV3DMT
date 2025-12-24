@@ -12,7 +12,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include "Output.h"
 #include "Element.h"
 #include "ConstantValues.h"
-
+#include <iomanip>
 void Output::Output::OutputObsCalcTipper(vector<double> omegas, std::vector< Element::Element*>* obsPointElements, std::string filename) {
 	std::ofstream f;
 	f.open(filename, std::ios::trunc);
@@ -783,6 +783,24 @@ void Output::Output::AppRhoOutputSurface(double omega,std::unordered_map<string,
 
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+
+
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 		//while (true) {
 		//	bool isFindPlotElement = true;
@@ -865,6 +883,24 @@ void Output::Output::AppRhoOutputSurface(double omega,std::unordered_map<string,
 		}
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
+
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 		//while (true) {
 		//	bool isFindPlotElement = true;
@@ -944,6 +980,22 @@ void Output::Output::PhiOutputSurface(double omega, std::unordered_map<string, E
 		}
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 		 
 		//while (true) {
@@ -1021,6 +1073,22 @@ void Output::Output::PhiOutputSurface(double omega, std::unordered_map<string, E
 		}
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 		//while (true) {
@@ -1099,6 +1167,22 @@ void Output::Output::ImpedanceOutputSurface(vector<double> omegas, std::unordere
 		}
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 		//while (true) {
@@ -1183,6 +1267,22 @@ void Output::Output::TipperOutputSurface(vector<double> omegas, std::unordered_m
 		}
 		Element::Element* tmpElement = element;
 		Element::Element* plotElement = element;
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+			}
+			else {
+				plotElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 		//while (true) {
@@ -1263,6 +1363,22 @@ void Output::Output::TipperOutputSurface(int iOmega,double omega, std::unordered
 
 			Element::Element* tmpElement = element;
 			Element::Element* plotElement = element;
+			bool upsideIsSea = true;
+			while (true) {
+				if (tmpElement->property->type == Property::Property::SEA) {
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+				}
+				else if (upsideIsSea) {
+					upsideIsSea = false;
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+				}
+				else {
+					plotElement = tmpElement;
+					break;
+					//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+				}
+			}
 			//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 			//while (true) {
@@ -1336,6 +1452,22 @@ void Output::Output::TipperOutputSurface(int iOmega,double omega, std::unordered
 
 			Element::Element* tmpElement = element;
 			Element::Element* plotElement = element;
+			bool upsideIsSea = true;
+			while (true) {
+				if (tmpElement->property->type == Property::Property::SEA) {
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+				}
+				else if (upsideIsSea) {
+					upsideIsSea = false;
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+				}
+				else {
+					plotElement = tmpElement;
+					break;
+					//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+				}
+			}
 			//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 			//while (true) {
@@ -1409,6 +1541,22 @@ void Output::Output::TipperOutputSurface(int iOmega,double omega, std::unordered
 
 			Element::Element* tmpElement = element;
 			Element::Element* plotElement = element;
+			bool upsideIsSea = true;
+			while (true) {
+				if (tmpElement->property->type == Property::Property::SEA) {
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+				}
+				else if (upsideIsSea) {
+					upsideIsSea = false;
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+				}
+				else {
+					plotElement = tmpElement;
+					break;
+					//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+				}
+			}
 			//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 			//while (true) {
@@ -1482,6 +1630,22 @@ void Output::Output::TipperOutputSurface(int iOmega,double omega, std::unordered
 
 			Element::Element* tmpElement = element;
 			Element::Element* plotElement = element;
+			bool upsideIsSea = true;
+			while (true) {
+				if (tmpElement->property->type == Property::Property::SEA) {
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+
+				}
+				else if (upsideIsSea) {
+					upsideIsSea = false;
+					tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1‚Â[‚¢ƒZƒ‹‚Ö
+				}
+				else {
+					plotElement = tmpElement;
+					break;
+					//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+				}
+			}
 			//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 
 			//while (true) {
@@ -1670,4 +1834,45 @@ void Output::Output::VTKObsPointsFileOutput(std::vector<Element::Element*>* obsP
 		f << str << endl;
 	}
 	f.close();
+}
+void Output::Output::OutputGradObjFunc(
+    double obj_val,
+    std::vector<Element::Element*>* invertedRhoIDToElementVector,
+    Eigen::MatrixXd* grad_out,
+    std::string filename)
+{
+    std::ofstream f(filename, std::ios::trunc);
+    f << std::scientific << std::setprecision(10);
+
+    f << obj_val << std::endl;
+
+    for (int i = 0; i < invertedRhoIDToElementVector->size(); i++) {
+        auto e = (*invertedRhoIDToElementVector)[i];
+        f << e->ID << " "
+          << e->resistivity << " "
+          << grad_out->coeff(i, 0) << " "
+          << grad_out->coeff(i, 1) << std::endl;
+    }
+
+    f.close();
+}
+void Output::Output::TxtOutput(std::vector< Element::Element*>* calcElements, Eigen::VectorXd* values, string outputFile) {
+	const char* filename2 = outputFile.c_str();
+	std::ofstream f;
+	f.open(filename2, std::ios::trunc);
+	for (int i = 0; i < calcElements->size(); i++) {
+		f << (*calcElements)[i]->centerCoord.coeff(0) << " " << (*calcElements)[i]->centerCoord.coeff(1) << " " << (*calcElements)[i]->centerCoord.coeff(2)
+			<< " " << values->coeff(i) << endl;
+	}
+	f.close();
+}
+void Output::Output::OutputInitialGuessFile(string filename, Eigen::VectorXcd& resultVector) {
+	std::ofstream f2;
+	f2.open(filename, std::ios::trunc);
+
+
+	for (int i = 0; i < resultVector.size(); i++) {
+		f2 << resultVector.coeff(i).real() << "," << resultVector.coeff(i).imag() << endl;
+	}
+	f2.close();
 }

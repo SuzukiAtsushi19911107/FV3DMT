@@ -50,6 +50,33 @@ namespace ReadData
 
 		bool isUnstructuredElements = false;
 
+		bool calcJustDataMisfit = false;
+
+		bool isFFTSensitivityMode = false;
+		double attenuation = 0.1;
+		int Nx = 51;
+		int Ny = 51;
+		int Nz = 51;
+		int K = 25;
+		int cells_window = 3;
+		int numEnsemble = 100;
+
+		double minX = -10000;
+		double maxX = 10000;
+		double minY = -10000;
+		double maxY = 10000;
+		double minZ = -10000;
+		double maxZ = 10000;
+
+		double epsR = 0.1;
+		double epsT = 0.0;
+		double eps_window = 0.;
+		double confidenceLevel1 = 0.05; //For line search to seek the solution within these values
+		double confidenceLevel2 = 0.01;
+		double lambda = -1.0;
+		bool usePreviousResult = false;
+		string orthogonalize = "objectiveFunction";
+
 		void ReadFile(std::string modelFileName,bool forwardCalc);
 		std::string AnalysisTag(std::string line);
 		std::vector<std::string> split( std::string line);
@@ -60,6 +87,7 @@ namespace ReadData
 		void AnalysisBoundary(std::ifstream* f);
 		void AnalysisInvSettings(std::ifstream* f);
 		void AnalysisLocationCalcSettings(std::ifstream* f);
+		void AnalysisFFTSensitivityAnalysis(std::ifstream* f);
 		void AnalysisUncertaintyAnalysisSettings(std::ifstream* f);
 		void AnalysisObsDataFile(std::ifstream* f);
 		void ReadImpedanceObsData(string filename);
@@ -67,7 +95,6 @@ namespace ReadData
 		void ReadInitialResistivityData(string resisFile);
 		void ReadInitialDistortionData(string distFile);
 		void ReadLocationDataFile(string filename);
-
 		
 	};
 	class HashFromCoordToSize_t {

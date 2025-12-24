@@ -4,6 +4,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 //#define OPTIM_USE_OPENMP Comment out because openmp is used in each loop in the function Optimize()
 #pragma once
+#include "mimalloc_config.h"
 #include "optim.hpp"
 #include <vector>
 #include <Eigen/Sparse>
@@ -32,9 +33,16 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <random>
 #include "Eigen/SVD"
 #include <random>
+#include <filesystem>
+#include <iostream>
+namespace fs = std::filesystem;
+//#define MI_MALLOC_OVERRIDE
+//#include <mimalloc.h>
+//#include <mimalloc-new-delete.h>
+//#include <mimalloc-override.h>
 //#include <Eigen/PardisoSupport>
 #include <unsupported/Eigen/src/IterativeSolvers/Scaling.h>
-
+#define EIGEN_DONT_PARALLELIZE
 using namespace std;
 using namespace ConstantValues;
 Analysis::Analysis::Analysis(ReadData::ReadData* readData) {
@@ -55,6 +63,8 @@ Analysis::Analysis::Analysis(ReadData::ReadData* readData) {
 	locationCalcSettings = readData->locationCalcSettings;
 	locationData = readData->locationData;
 
+	calcJustDataMisfit = readData->calcJustDataMisfit;
+
     //変数初期化
 	maxResis = invSettings->maxResis;
 	minResis = invSettings->minResis;
@@ -67,9 +77,34 @@ Analysis::Analysis::Analysis(ReadData::ReadData* readData) {
 	useL1Norm = invSettings->useL1Norm;
 	rateL1Norm = invSettings->rateL1Norm;
 
+	//params for FFT Sensitivity Analysis
+	FFTSensitivityMode=readData->isFFTSensitivityMode;
+	attenuation=readData->attenuation;
+	Nx=readData->Nx;
+	Ny=readData->Ny;
+	Nz=readData->Nz;
+	K=readData->K;
+	cells_window=readData->cells_window;
+	numEnsemble=readData->numEnsemble;
+
+	minX=readData->minX;
+	maxX=readData->maxX;
+	minY=readData->minY;
+	maxY=readData->maxY;
+	minZ=readData->minZ;
+	maxZ=readData->maxZ;
+
+	epsR=readData->epsR;
+	epsT=readData->epsT;
+	eps_window=readData->eps_window;
+	confidenceLevel1=readData->confidenceLevel1; //For line search to seek the solution within these values
+	confidenceLevel2=readData->confidenceLevel2;
+	orthogonalize = readData->orthogonalize;
+	lambdaForFFT = readData->lambda;
+	usePreviousResult = readData->usePreviousResult;
 }
 void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJacobiMatrix,bool onePointMode) {
-	Eigen::setNbThreads(0);
+	Eigen::setNbThreads(1);
 	if (isDirectSolver) {
 		for (int iOmega = 0; iOmega < boundary->omega.size(); iOmega++) {
 			omega = boundary->omega[iOmega];
@@ -172,7 +207,9 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 		cout << "End Update Matrix." << endl;
 		std::cout << "Calculation Time:" << end_t - start_t << " Seconds." << endl;
 		Eigen::setNbThreads(1);
-
+		if (invSettings->initialGuessFile != "None") {
+			ReadInitialGuess(invSettings->initialGuessFile, resultVector);
+		}
 
 #pragma omp parallel for
 		for (int iOmega = 0; iOmega < boundary->omega.size(); iOmega++) {
@@ -185,7 +222,12 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 			
 			
 		}
-		Eigen::setNbThreads(0);
+
+		if (invSettings->InitialGuessOutputFile!="None") {
+			output->OutputInitialGuessFile(invSettings->InitialGuessOutputFile, resultVector);
+		}
+
+		Eigen::setNbThreads(1);
 		for (int iOmega = 0; iOmega < boundary->omega.size(); iOmega++) {
 			omega = boundary->omega[iOmega];
 
@@ -195,7 +237,7 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 			CalcZ(iOmega);
 			CalcT(iOmega);
 
-			if (!isCalcInversionValues) {
+			if (!isCalcInversionValues && !FFTSensitivityMode) {
 				output->TxtOutputAppRho(boundary->omega[iOmega], &calcElements);
 				output->AppRhoOutputSurface(boundary->omega[iOmega], &elements);
 				output->PhiOutputSurface(boundary->omega[iOmega], &elements);
@@ -221,6 +263,20 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 				CalcDTDHElements(iOmega);
 			}
 		}
+		if (calcJustDataMisfit) {
+			std::cout<<"calcJustDataMisfit is True, so calc will exit after output data!!!" << endl;
+			CalcDataMisfit();
+			double tmp=weightRoughening * CalcRoughningMatrixPenalty();
+			if (isInvertedDistortion) {
+				CalcConstraintDistortionTerm();
+				tmp += weightRougheningForDistortion * constraintDistortionTerm;
+				
+			}
+			std::cout << "Data Misfit:" << dataMisfit << std::endl;
+			std::cout << "Objective Function:" << dataMisfit + tmp << std::endl;
+			std::cout << "RMS:"<<std::pow(dataMisfit / numOfObsData, 0.5) << endl;
+			exit(0);
+		}
 		Eigen::setNbThreads(1);
 
 #pragma omp parallel for
@@ -236,7 +292,7 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 			lambdaDRDRho.setZero();
 		}
 
-		Eigen::setNbThreads(0);
+		Eigen::setNbThreads(1);
 		
 		
 		for (int iOmega = 0; iOmega < boundary->omega.size(); iOmega++) {
@@ -284,7 +340,7 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 	output->ImpedanceOutputSurface(boundary->omega, &elements);
 	output->TipperOutputSurface(boundary->omega, &elements);
 
-	Eigen::setNbThreads(0);
+	Eigen::setNbThreads(1);
 }
 void Analysis::Analysis::SetH(int iOmega) {
 	for (int i = 0; i < numOfCalcElements; i++) {
@@ -560,6 +616,8 @@ void Analysis::Analysis::Initialize() {
 	else {
 		dJdRho.resize(numOfInvertedResistivityElements);
 	}
+	dUdRho_output.resize(numOfInvertedResistivityElements,2);
+	dUdRho_output.setZero();
 	dJdRho.setZero();
 
 	//jacobian = new Eigen::MatrixXd;
@@ -583,6 +641,7 @@ void Analysis::Analysis::Initialize() {
 	}
 	SetInitialDistortionFromFile();
 	dDataMisfitDDistortionParam.resize(4 * numOfObsImpedanceElements);
+	invSettings->eps_distortionConstraint = 4 * numOfObsImpedanceElements * std::pow(invSettings->epsRatio , 2.0);
 	//CalcResistivityAtTransitionElements();
 	if (isDirectSolver) {
 		m_res.resize(1);
@@ -881,11 +940,22 @@ void Analysis::Analysis::Solve_iterative(int iOmega,int threadID) {
 		sol[1].resize(3 * numOfCalcElements);
 		sol[0].setZero();
 		sol[1].setZero();
+		
+
+
+		bool infFlag = false;
 		for (int itr = 0; itr < 2; itr++) {
 			for (int i = 0; i < 3 * numOfCalcElements; i++) {
 				int solCol = originalOrderToSolverOrder[i];
 				sol[itr].coeffRef(solCol) = resultVector.coeff((2 * iOmega + itr) * 3 * numOfCalcElements + i); //phi is zero as initial guess
+				if (!std::isfinite(sol[itr].coeffRef(solCol).real()) || !std::isfinite(sol[itr].coeffRef(solCol).imag())) {
+					infFlag = true;
+				}
 			}
+		}
+		if (infFlag) {
+			sol[0].setZero();
+			sol[1].setZero();
 		}
 		//Eigen::SparseMatrix < complex<double>, Eigen::RowMajor> mat;
 		//mat.resize(3 * numOfCalcElements, 3 * numOfCalcElements );
@@ -1046,7 +1116,7 @@ void Analysis::Analysis::CalcT(int iOmega) {
 
 }
 void Analysis::Analysis::SetNeighborElements() {
-	//#pragma omp parallel for
+	#pragma omp parallel for
 	//for (auto itr = elementsVector.begin(); itr != elementsVector.end(); itr++) {
 	for (int i = 0; i < elementsVector.size(); i++) {
 		Element::Element* element = elementsVector[i];
@@ -1386,20 +1456,17 @@ void Analysis::Analysis::AssociationPropertiesToElements() {
 	for (auto itr = elementsVector.begin(); itr != elementsVector.end(); itr++) {
 		Element::Element* element = *itr;
 		bool findProp = false;
-		for (auto itr2 = propertiesVector.begin(); itr2 != propertiesVector.end(); itr2++) {
-			Property::Property* property = *itr2;
-			int propID = property->ID;
-			if (element->propID == propID) {
-				element->property = property;
-				element->resistivity = property->resistivity;
-				element->initialResistivity= property->resistivity;
-				findProp = true;
-			}
-		}
-		if (!findProp) {
+		if (!properties.contains(element->propID)) {
 			std::cout << "No Property ID which set to Element in Data" << std::endl;
 			exit(1);
 		}
+		Property::Property* property = properties[element->propID];
+		int propID = property->ID;
+
+		element->property = property;
+		element->resistivity = property->resistivity;
+		element->initialResistivity = property->resistivity;
+
 
 
 	}
@@ -1567,6 +1634,23 @@ void Analysis::Analysis::SetObsDataToElement() {
 
 		Element::Element* tmpElement = element;
 		Element::Element* obsElement = element;
+
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1つ深いセルへ
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1つ深いセルへ
+			}
+			else {
+				obsElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 
 		//Comment out Below Because We set Air Cell Around Ground To AirGroundBoundaryCell 
 		//while (true) {
@@ -2193,12 +2277,18 @@ void Analysis::Analysis::CalcLambda(int iOmega, int threadID,bool onePointMode) 
 		globalMatrixToBeSolvedImag.pruned();
 
 
-
+		bool infFlag = false;
+		
 		for (int i = 0; i < 3 * numOfCalcElements; i++) {
 			int solRow = originalOrderToSolverOrder[i];
 			sol[0].coeffRef(solRow) = resultAdjointVector.coeff((2 * iOmega) * 3 * numOfCalcElements + i);
+			if (!std::isfinite(sol[0].coeffRef(solRow).real()) || !std::isfinite(sol[0].coeffRef(solRow).imag())) {
+				infFlag = true;
+			}
 		}
-		
+		if (infFlag) {
+			sol[0].setZero();
+		}
 		//====H2========
 
 		for (int i = 0; i < 3 * numOfCalcElements; i++) {
@@ -2206,11 +2296,19 @@ void Analysis::Analysis::CalcLambda(int iOmega, int threadID,bool onePointMode) 
 			rhs[1].coeffRef(solRow) = conj(dJdH[threadID].coeff(3 * numOfCalcElements + i));
 		}
 
-
+		infFlag = false;
 		for (int i = 0; i < 3 * numOfCalcElements; i++) {
 			int solRow = originalOrderToSolverOrder[i];
 			sol[1].coeffRef(solRow) = resultAdjointVector.coeff((2 * iOmega + 1) * 3 * numOfCalcElements + i);
+			if (!std::isfinite(sol[1].coeffRef(solRow).real()) || !std::isfinite(sol[1].coeffRef(solRow).imag())) {
+				infFlag = true;
+			}
+		}	
+
+		if (infFlag) {
+			sol[1].setZero();
 		}
+
 		iterativeSolverVector[boundary->omega.size() + iOmega]->omega = boundary->omega[iOmega];
 		iterativeSolverVector[boundary->omega.size() + iOmega]->m_maxIteration = invSettings->maxIterationBiCGSafe;
 		iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTol = invSettings->toleranceIterativeSolver;
@@ -2410,20 +2508,48 @@ void Analysis::Analysis::SetInvertedElements() {
 	}*/
 	//テスト終わり
 
+	//numOfInvertedResistivityElements = 0;
+	//invertedRhoIDToElementVector.clear();
+	//for (int i = 0; i < numOfCalcElements; i++) {
+	//	Element::Element* element = calcElementsVector[i];
+	//	if (element->boundary == "NOT_BOUNDARY" && (element->property->type == Property::Property::NORMAL || element->isAirGroundBoundaryCell)){// && element->boundary=="NOT_BOUNDARY" && element->isAirGroundBoundaryCell == false) {
+	//		//elements of isAirGroundBoundaryCell and Boundary are inverted, but not independent.so here, they are included in inverted elements group.
+	//		element->invertedRhoElementsID = numOfInvertedResistivityElements;
+	//		invertedRhoIDToElementMap[numOfInvertedResistivityElements] = element;
+	//		invertedRhoIDToElementVector.push_back(element);
+	//		element->isInvertedElement = true;
+	//		numOfInvertedResistivityElements++;
+	//	}
+	//	else {
+	//		element->invertedRhoElementsID = -1;
+	//	}
+	//}
 	numOfInvertedResistivityElements = 0;
 	invertedRhoIDToElementVector.clear();
 	for (int i = 0; i < numOfCalcElements; i++) {
 		Element::Element* element = calcElementsVector[i];
-		if (element->boundary == "NOT_BOUNDARY" && (element->property->type == Property::Property::NORMAL || element->isAirGroundBoundaryCell)){// && element->boundary=="NOT_BOUNDARY" && element->isAirGroundBoundaryCell == false) {
+		if (element->boundary == "NOT_BOUNDARY" && (element->property->type == Property::Property::NORMAL)) {// && element->boundary=="NOT_BOUNDARY" && element->isAirGroundBoundaryCell == false) {
 			//elements of isAirGroundBoundaryCell and Boundary are inverted, but not independent.so here, they are included in inverted elements group.
 			element->invertedRhoElementsID = numOfInvertedResistivityElements;
 			invertedRhoIDToElementMap[numOfInvertedResistivityElements] = element;
 			invertedRhoIDToElementVector.push_back(element);
+			element->isInvertedElement = true;
 			numOfInvertedResistivityElements++;
 		}
 		else {
 			element->invertedRhoElementsID = -1;
 		}
+	}
+	for (int i = 0; i < numOfCalcElements; i++) {
+		Element::Element* element = calcElementsVector[i];
+		if (element->isAirGroundBoundaryCell && element->neighborElements[1 + 3 * 1 + 9 * 2]->isInvertedElement) {// && element->boundary=="NOT_BOUNDARY" && element->isAirGroundBoundaryCell == false) {
+			element->invertedRhoElementsID = numOfInvertedResistivityElements;
+			invertedRhoIDToElementMap[numOfInvertedResistivityElements] = element;
+			invertedRhoIDToElementVector.push_back(element);
+			element->isInvertedElement = true;
+			numOfInvertedResistivityElements++;
+		}
+
 	}
 }
 
@@ -2869,10 +2995,14 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 
 	}
 
+	//For MultipleObjFunc
+	double objfuncVal = 0;
+	double misfit=0.0;
 	//lambda term
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
 		dJdRho.coeffRef(i) -= lambdaDRDRho.coeff(i).real();
 	}
+
 	//save dJdRho for sensitivity output
 	if (convertParamMode) {
 		for (int i = 0; i < outputSensitivityVector.size(); i++) {
@@ -2896,9 +3026,19 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 
 
 	//term of roughning matrix
+	Eigen::VectorXd roughnessterm{ numOfInvertedResistivityElements };
 	Eigen::VectorXd logRhoVec{ numOfInvertedResistivityElements };
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
 		logRhoVec.coeffRef(i) = log(invertedRhoIDToElementVector[i]->resistivity);
+	}
+
+	double weightRougheningPre = weightRoughening;
+	if (FFTSensitivityMode && lambdaForFFT>0) {
+		weightRoughening = lambdaForFFT;
+	}
+	if (FFTSensitivityMode && weightRoughening < 0) {
+		cout << "Warning::WeightRoughning is not set!! Assume weightRoughening as zero!!!!" << endl;
+		weightRoughening = 0.0;
 	}
 	if (useL1Norm) {
 		for (int i = 0; i < rougheningMatrix->outerSize(); ++i) {
@@ -2932,9 +3072,10 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 
 		}
 	}
+
 	else {
 		string filename = "roughenessterm_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".vtk";
-		Eigen::VectorXd roughnessterm{ numOfInvertedResistivityElements };
+		
 		Eigen::VectorXd WTWm{ numOfInvertedResistivityElements };
 		WTWm = rougheningMatrix->transpose() * (*rougheningMatrix) * logRhoVec;
 		//WTWm = rougheningMatrix->transpose()*(*rougheningMatrix)*rhoVec;
@@ -2964,11 +3105,16 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 				if (calcElementsVector[it.col()]->invertedRhoElementsID >= 0) {
 					dJdRho.coeffRef(calcElementsVector[it.col()]->invertedRhoElementsID) += calcElementsVector[i]->MPCResistivityCoeff.coeff(0, it.col())
 						* dJdRho.coeff(calcElementsVector[i]->invertedRhoElementsID);
+
+					roughnessterm.coeffRef(calcElementsVector[it.col()]->invertedRhoElementsID) += calcElementsVector[i]->MPCResistivityCoeff.coeff(0, it.col())
+						* roughnessterm.coeff(calcElementsVector[i]->invertedRhoElementsID);
 				}
 			}
 			dJdRho.coeffRef(calcElementsVector[i]->invertedRhoElementsID) = 0.0;
+			roughnessterm.coeffRef(calcElementsVector[i]->invertedRhoElementsID) = 0.0;
 		}
 	}
+
 	//for (int i = 0; i < numOfInvertedResistivityElements; i++) {
 	//	if (invertedRhoIDToElementVector[i]->masterResistivityElement != nullptr) {
 
@@ -2978,17 +3124,29 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 	//	}
 	//}
 
+	if (FFTSensitivityMode) {
+		for (int i = 0; i < numOfInvertedResistivityElements; i++) {
+			invertedRhoIDToElementVector[i]->dDataMisfitDRho = dJdRho.coeff(i) - roughnessterm.coeff(i);
+			invertedRhoIDToElementVector[i]->dRoughnessTermDRho = roughnessterm.coeff(i);
+		}
+	}
+
+	dUdRho_output.resize(numOfInvertedResistivityElements,2);
+
 	//Convert dJ/dRho ->dJ/dParam
 	if (convertParamMode) {
 		for (int i = 0; i < numOfInvertedResistivityElements; i++) {
+			dUdRho_output.coeffRef(i, 0) = dJdRho.coeff(i); //Including constraint term
+			dUdRho_output.coeffRef(i, 1) = dJdRho.coeff(i)- roughnessterm.coeff(i);//excluding constraint term
 			dJdRho.coeffRef(i) = dJdRho.coeff(i) * dRhoDParam.coeff(i);
 
 		}
 	}
+	
 	if (isInvertedDistortion) {
 		//data misfit term
 		CalcDDataMisfitDDistortionParam();
-
+		
 		/*double pre = CalcDataMisfit();
 		double d = 0.001;
 		for (int i = 0; i < numOfObsImpedanceElements; i++) {
@@ -2997,9 +3155,12 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 			cout << "numerical:" << (post - pre) / d << endl;
 			cout << "autodif:" << dDataMisfitDDistortionParam.coeff(4 * i + 3) << endl;
 		}*/
+		double funcVal = 1.0;
+		double misfitVal = 1.0;
+
 		
 		for (int i = 0; i < 4 * numOfObsImpedanceElements; i++) {
-			dJdRho.coeffRef(numOfInvertedResistivityElements + i) = dDataMisfitDDistortionParam.coeff(i);
+			dJdRho.coeffRef(numOfInvertedResistivityElements + i) = dDataMisfitDDistortionParam.coeff(i)/ misfitVal;
 		}
 
 		//constraint term
@@ -3008,16 +3169,20 @@ void Analysis::Analysis::CalcDJDRho(bool convertParamMode) {
 				for (int k = 0; k < 2; k++) {
 					if ((j == 0 && k == 0) || (j == 1 && k == 1)) {
 						dJdRho.coeffRef(numOfInvertedResistivityElements + 4 * i + 2 * j + k) += weightRougheningForDistortion * 2.0 *
-							(obsImpedanceElements[i]->distortionMatrix.coeff(j, k) - 1.0);
+							(obsImpedanceElements[i]->distortionMatrix.coeff(j, k) - 1.0)/ funcVal;
 					}
 					else {
 						dJdRho.coeffRef(numOfInvertedResistivityElements + 4 * i + 2 * j + k) += weightRougheningForDistortion * 2.0 *
-							(obsImpedanceElements[i]->distortionMatrix.coeff(j, k));
+							(obsImpedanceElements[i]->distortionMatrix.coeff(j, k))/ funcVal;
 					}
 				}
 			}
 
 		}
+
+	}
+	if (FFTSensitivityMode) {
+		weightRoughening = weightRougheningPre; //for safety, recover the value.
 	}
 }
 
@@ -3124,6 +3289,7 @@ void Analysis::Analysis::CalcRougheningMatrix() {
 
 	////Diff Filter
 	 rougheningMatrix->reserve(Eigen::VectorXi::Constant(6 * numOfInvertedResistivityElements, 6));
+\
 	for (int iInvElem = 0; iInvElem < numOfInvertedResistivityElements; iInvElem++) {
 		Element::Element* element = invertedRhoIDToElementVector[iInvElem];
 
@@ -3450,7 +3616,7 @@ void Analysis::Analysis::CalcRougheningMatrix() {
 
 inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eigen::VectorXd* grad_out, void* opt_data)
 {
-
+\
 	bool isChangeResis = false;
 	Eigen::VectorXd ParamResis(numOfInvertedResistivityElements);
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
@@ -3501,19 +3667,27 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 
 	double obj_val;
 	obj_val = 0.0;
-	obj_val += CalcDataMisfit();
+	double factor = 1.0;
+	double RMS;
+
+	obj_val = CalcDataMisfit();
+	RMS = std::pow(obj_val / numOfObsData, 0.5);
+	
+	
 	std::cout << "DataMisfit:" << obj_val << std::endl;
 
-	double RMS = std::pow(obj_val/numOfObsData , 0.5);
+
 	RMScur = RMS;
 
 	double roughningMatrixPenaltyTerm = CalcRoughningMatrixPenalty();
-	
+
 
 	obj_val += weightRoughening * roughningMatrixPenaltyTerm; 
 	if (isInvertedDistortion) {
 		CalcConstraintDistortionTerm();
+
 		obj_val += weightRougheningForDistortion * constraintDistortionTerm;
+		
 	}
 	bool isFirstLoop = false;
 	if (optMethod == "GD") {
@@ -3522,6 +3696,7 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 			obj_valPre = 1.0;
 			isFirstLoop = true;
 		}
+
 		else if (inheritPreviousObjVal == true && isFirstLoopInheritPreviousObjVal) {
 			isFirstLoop = true;
 			isFirstLoopInheritPreviousObjVal = false;
@@ -3547,9 +3722,14 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 			CalcDJDRho();
 			//CalcJacobian();
 		}
-		(*grad_out) = dJdRho / initObjVal;
+		if (optMethod == "GD") {
+			(*grad_out) = dJdRho / initObjVal;
+		}
+		else {
+			(*grad_out) = dJdRho;
+		}
 	}
-
+	obj_valNotNormalized = obj_val;
 	if (settings.numOfIteration % invSettings->outputInterval <= 0) {
 		if (numOfSameModelWeightCalc == 1) {
 			std::string filename = "Rho_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".vtk";
@@ -3562,6 +3742,8 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 			output->OutputObsCalcImpedance(boundary->omega, &obsPointElements, filename);
 			filename = "ObsCalcTipper_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".txt";
 			output->OutputObsCalcTipper(boundary->omega, &obsPointElements, filename);
+			filename = "gradObjFunc_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".txt";
+			output->OutputGradObjFunc(obj_val,&invertedRhoIDToElementVector, &dUdRho_output, filename);
 
 			if (isInvertedDistortion) {
 				filename = "Distortion_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".txt";
@@ -3581,6 +3763,8 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 			output->OutputObsCalcTipper(boundary->omega, &obsPointElements, filename);
 			filename = "Sensitivity_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".vtk";
 			output->VTKFileOputput(&outputSensitivityVector, &dJExceptRoughnessDRho, filename);
+			filename = "gradObjFunc_" + std::to_string(weightRoughening) + "_" + std::to_string(numOfSameModelWeightCalc) +"_" + std::to_string(settings.numOfIteration) + ".txt";
+			output->OutputGradObjFunc(obj_val,&invertedRhoIDToElementVector, &dUdRho_output, filename);
 			if (isInvertedDistortion) {
 				filename = "Distortion_" + std::to_string(weightRoughening) + "_" + std::to_string(numOfSameModelWeightCalc) + "_" + std::to_string(settings.numOfIteration) + ".txt";
 				output->OutputDistortionMatrix(&obsImpedanceElements, constraintDistortionTerm, filename);
@@ -3644,10 +3828,10 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 		obj_val = obj_val / initObjVal;
 		
 	}
-	else {
-		obj_val = obj_val/ initObjVal;
+	//else {
+	//	obj_val = obj_val;
 
-	}
+	//}
 	
 	//if (optMethod == "GD" && obj_valPre < obj_val) {
 	//	//if (RMScur > thresholdRMS) {
@@ -3693,8 +3877,10 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 	if (!std::isfinite(obj_val)) {
 		obj_val = 1e30;
 		if (grad_out) {
-			grad_out->setOnes() * 1e30;
+			grad_out->setOnes();
+			(*grad_out) *= 1e30;   // ←こうする
 		}
+		return obj_val;
 	}
 	else {
 		obj_valPre = obj_val;
@@ -3743,6 +3929,7 @@ inline Eigen::Vector2d Analysis::Analysis::OptimizeUsingJacobian(const Eigen::Ve
 	//}
 	//double obj_val;
 	//obj_val = 0.0;
+	// 
 	//obj_val += CalcDataMisfit();
 	//std::cout << "DataMisfit:" << obj_val << std::endl;
 
@@ -3839,7 +4026,11 @@ void Analysis::Analysis::RunOptimize() {
 		}
 	}
 
-
+	if (FFTSensitivityMode) {
+		std::cout << "FFT Sensitivity Mode is Running!!!!!!!!" << endl;
+		RunFFTSensitivityAnalysis();
+		exit(0);
+	}
 
 
 
@@ -3859,6 +4050,12 @@ void Analysis::Analysis::RunOptimize() {
 	settings.gd_settings.par_step_size = invSettings->par_step_size;
 	settings.gd_settings.loosenFactor = invSettings->loosenFactor;
 	settings.gd_settings.decreaseFactor = invSettings->decreaseFactor;
+	
+	settings.gd_settings.numWarmUp = invSettings->numWarmUp;
+	settings.gd_settings.minIterations = invSettings->minIterations;
+	settings.gd_settings.averageIterations = invSettings->averageIterations;
+	settings.gd_settings.numTrunc = invSettings->numTrunc;
+
 	settings.iter_max = invSettings->maxIterationPerModelConstraint;
 	settings.lbfgs_settings.step =1;
 	settings.lbfgs_settings.wolfe_cons_1 = 1e-3;
@@ -3940,9 +4137,13 @@ void Analysis::Analysis::RunOptimize() {
 			weightRoughening = modelConstraintMin * std::pow(10.0, std::log10(modelConstraintMax / modelConstraintMin)*double(i) / double(numOfCalcModelConstraint - 1));
 			weightRougheningForDistortion = weightRoughening;
 			bool success = false;
-			if (RMScur < invSettings->RMSSwitchingToGD) {
+			if (optMethod=="LBFGS" && RMScur < invSettings->RMSSwitchingToGD) {
 				optMethod = "GD";
 				cout << "RMS IS BELOW RMSSwitchingToGD. SWITCH TO GD METHOD!!!!!" << endl;
+			}
+			if (optMethod == "GD" && RMScur < invSettings->RMSSwitchingToLBFGS) {
+				optMethod = "LBFGS";
+				cout << "RMS IS BELOW RMSSwitchingToLBFGS. SWITCH TO L-BFGS METHOD!!!!!" << endl;
 			}
 			if (optMethod == "GD") {
 				initObjVal = 0.0;
@@ -3951,7 +4152,7 @@ void Analysis::Analysis::RunOptimize() {
 			}
 			else if (optMethod == "LBFGS") {
 				initObjVal = 0.0;
-				settings.lbfgs_settings.par_M = settings.iter_max;
+				//settings.lbfgs_settings.par_M = settings.iter_max;
 				success = optim::lbfgs(paramVec, optFunc, opt_data, settings);
 
 			}
@@ -3983,6 +4184,7 @@ void Analysis::Analysis::RunOptimize() {
 			//	}
 			//	break;
 			//}
+
 
 		}
 	}
@@ -4021,9 +4223,13 @@ void Analysis::Analysis::RunOptimize() {
 			settings.grad_err_tol = invSettings->grad_err_tolVector[i];
 			settings.iter_max = invSettings->maxIterationVector[i];
 			bool success = false;
-			if (RMScur < invSettings->RMSSwitchingToGD) {
+			if (optMethod == "LBFGS" && RMScur < invSettings->RMSSwitchingToGD) {
 				optMethod = "GD";
 				cout << "RMS IS BELOW RMSSwitchingToGD. SWITCH TO GD METHOD!!!!!" << endl;
+			}
+			if (optMethod == "GD" && RMScur < invSettings->RMSSwitchingToLBFGS) {
+				optMethod = "LBFGS";
+				cout << "RMS IS BELOW RMSSwitchingToLBFGS. SWITCH TO L-BFGS METHOD!!!!!" << endl;
 			}
 			if (optMethod == "GD") {
 				
@@ -4099,6 +4305,7 @@ void Analysis::Analysis::RunOptimize() {
 					adoptedLambdaNumber = i;
 				}
 			}
+
 		}
 	}
 	std::cout << "Adopted Model Constraint:" << adoptModelConstraint << endl;
@@ -4111,6 +4318,16 @@ void Analysis::Analysis::RunOptimize() {
 	output->TxtOutputResistivity(&elements, "FinalResistivity.txt");
 	infofile.close();
 
+	string filename = "gradObjFunc.txt";
+	output->OutputGradObjFunc(obj_valNotNormalized, &invertedRhoIDToElementVector, &dUdRho_output, filename);
+	if (isInvertedDistortion) {
+		filename = "Distortion.txt";
+		output->OutputDistortionMatrix(&obsImpedanceElements, constraintDistortionTerm, filename);
+		filename = "DistortionForRestart.txt";
+		output->OutputDistortionMatrixForRestart(&obsImpedanceElements, filename);
+	}
+
+	
 	//if (success) {
 	//	std::cout << "cg: sphere test completed successfully." << std::endl;
 	//}
@@ -4560,6 +4777,93 @@ void Analysis::Analysis::CalcJacobian(int iOmega) {
 //	cout << "End Calculating Jacobian #Omega:" << iOmega << endl;
 //}
 }
+namespace {
+	struct KDTree3 {
+		struct Node {
+			int idx;         
+			int axis;        
+			int left;        
+			int right;       
+			double split;     
+		};
+
+		const std::vector<InitialResistivityData::InitialResistivityData*>& pts;
+		std::vector<int> order;                         
+		std::vector<Node> nodes;                         
+		int root = -1;
+
+		KDTree3(const std::vector<InitialResistivityData::InitialResistivityData*>& points) : pts(points) {
+			const int n = static_cast<int>(pts.size());
+			order.resize(n);
+			std::iota(order.begin(), order.end(), 0);
+			nodes.reserve(n * 2); 
+			root = build(0, n, 0); 
+		}
+
+		inline double coord(int i, int axis) const {
+
+			return pts[i]->coord.coeff(axis);
+		}
+
+
+		int build(int l, int r, int axis) {
+			if (l >= r) return -1;
+			int m = (l + r) / 2;
+			auto comp = [&](int a, int b) { return coord(a, axis) < coord(b, axis); };
+			std::nth_element(order.begin() + l, order.begin() + m, order.begin() + r, comp);
+
+			Node node;
+			node.idx = order[m];
+			node.axis = axis;
+			node.split = coord(node.idx, axis);
+			node.left = build(l, m, (axis + 1) % 3);
+			node.right = build(m + 1, r, (axis + 1) % 3);
+
+			int id = (int)nodes.size();
+			nodes.push_back(node);
+			return id;
+		}
+
+
+		int nearest(const double q[3]) const {
+			int best_idx = -1;
+			double best_d2 = std::numeric_limits<double>::infinity();
+
+
+			struct Frame { int node; };
+			std::vector<Frame> st;
+			if (root != -1) st.push_back({ root });
+
+			while (!st.empty()) {
+				int ni = st.back().node;
+				st.pop_back();
+				const Node& nd = nodes[ni];
+
+				double dx = q[0] - coord(nd.idx, 0);
+				double dy = q[1] - coord(nd.idx, 1);
+				double dz = q[2] - coord(nd.idx, 2);
+				double d2 = dx * dx + dy * dy + dz * dz;
+				if (d2 < best_d2) {
+					best_d2 = d2;
+					best_idx = nd.idx;
+				}
+
+
+				double diff = q[nd.axis] - nd.split;
+				int first = diff <= 0.0 ? nd.left : nd.right;
+				int second = diff <= 0.0 ? nd.right : nd.left;
+
+				if (first != -1) st.push_back({ first });
+
+
+				if (second != -1 && diff * diff < best_d2) {
+					st.push_back({ second });
+				}
+			}
+			return best_idx; 
+		}
+	};
+}
 void Analysis::Analysis::SetInitialResistivityFromFile() { //Set Nearest Resistivity in InitialData
 	if (initialResistivityData.size() == 0) {
 		return;
@@ -4588,10 +4892,12 @@ void Analysis::Analysis::SetInitialResistivityFromFile() { //Set Nearest Resisti
 		invSettings->maxResis = maxCellsResis - 1e-3;
 		maxResis = invSettings->maxResis;
 	}
+	
+	KDTree3 kdt(initialResistivityData);
 
 	for (int i = 0; i<numOfCalcElements; i++) {
 		Element::Element* element = calcElementsVector[i];
-		double nearestDistance = 1e30;
+		/*double nearestDistance = 1e30;
 		int nearestID = -1;
 		for (int j = 0; j < initialResistivityData.size(); j++) {
 			double distance = (element->centerCoord - initialResistivityData[j]->coord).norm();
@@ -4603,7 +4909,23 @@ void Analysis::Analysis::SetInitialResistivityFromFile() { //Set Nearest Resisti
 		if (nearestID == -1) {
 			cout << "Error In SetInitialResistivityFromFile" << endl;
 			exit(1);
+		}*/
+
+		double q[3] = {
+		element->centerCoord.coeff(0),
+		element->centerCoord.coeff(1),
+		element->centerCoord.coeff(2)
+		};
+
+		int ret_index = kdt.nearest(q);
+		if (ret_index < 0) {
+			std::cout << "Error In SetInitialResistivityFromFile (KD-tree search failed)\n";
+			std::exit(1);
 		}
+
+
+		int nearestID = initialResistivityData[ret_index]->ID;
+
 		//cout << initialResistivityData[nearestID]->resistivity << invSettings->maxResis << endl;
 		if (initialResistivityData[nearestID]->resistivity > invSettings->maxResis ) {
 			for (auto itr2 = propertiesVector.begin(); itr2 != propertiesVector.end(); itr2++) {
@@ -5070,13 +5392,13 @@ void Analysis::Analysis::RunLocationCalc() {
 		f << "ID," << loop << endl;
 		f << "XY," << locElement->centerCoord.coeff(0) << "," << locElement->centerCoord.coeff(1) << endl;
 		f << "InitialFuncVal," << initialMisfit << endl;
-		f << "numberOfEstimationPoints,ratio,alpha,dFuncVal,actualRatio,ProbabilityDensityFunction_Pre,ProbabilityDensityFunction_Pos" << endl;
+		f << "numberOfEstimationPoints,ratio,alpha,delta_dataMisfit,actualRatio,initialDataMisfit,postDataMisfit,maxProbIncreaseInObs" << endl;
 		for (int ip = 0; ip < locationCalcSettings->numOfSplit; ip++) {
 
 			//Plus Direction
 			double sum = 0;
 			for (int i = 0; i < numOfInvertedResistivityElements; ++i) {
-				sum +=  dJDRhoOnlyResis(i) * dJDRhoOnlyResis.coeff(i);
+				sum +=  dJDRhoOnlyResis.coeff(i) * dJDRhoOnlyResis.coeff(i);
 			}
 			double ratio = (locationCalcSettings->widthImpedance - 1.0) * double(ip + 1) / double(locationCalcSettings->numOfSplit);
 			double alpha = ratio * initialOnePointObjValue / sum; 
@@ -5096,8 +5418,11 @@ void Analysis::Analysis::RunLocationCalc() {
 			//Update Resis
 			for (int i = 0; i < numOfInvertedResistivityElements; ++i) {
 				invertedRhoIDToElementVector[i]->resistivity += alpha * dJDRhoOnlyResis.coeff(i) ;
-				if (invertedRhoIDToElementVector[i]->resistivity < 0.0) {
+				if (invertedRhoIDToElementVector[i]->resistivity < minResis) {
 					invertedRhoIDToElementVector[i]->resistivity = minResis;
+				}
+				if (invertedRhoIDToElementVector[i]->resistivity > maxResis) {
+					invertedRhoIDToElementVector[i]->resistivity = maxResis;
 				}
 			}
 
@@ -5126,12 +5451,17 @@ void Analysis::Analysis::RunLocationCalc() {
 				}
 			}
 			//double dFuncVal = CalcMaxImpedanceDataComparedToVarience();
-			Eigen::Vector3d returnVal;
+			/*Eigen::Vector3d returnVal;
 			returnVal = CalcMaxDatafitChangeUsingNormalDistribution();
-			double dFuncVal = returnVal.coeff(0);
+			double dFuncVal = returnVal.coeff(0);*/
+			double postMisfit = CalcDataMisfit(false);
+			
 
 			//Calc Actual moving value for the direction
 			double onePointObjValue = CalcDataMisfit(true);
+
+			//Calc MaxDataMisfit Increase
+			Eigen::VectorXd probMaxIncreaseEachObsPoints=CalcEachObservationProbIncrease();
 
 			//Recover Resis and set for output
 			Eigen::VectorXd diffRho{ numOfInvertedResistivityElements };
@@ -5144,8 +5474,12 @@ void Analysis::Analysis::RunLocationCalc() {
 			output->VTKFileOputput(&invertedRhoIDToElementVector, &diffRho, filename);
 			filename = "Rho_LocationCalc_" + std::to_string(loop) + "_" + std::to_string(ip) + ".txt";
 			output->TxtOutputResistivity(&elements, filename);
-			f << ip << "," << ratio<<","<<alpha<<","<<dFuncVal<<","<<onePointObjValue/initialOnePointObjValue- 1.0 <<","<< returnVal.coeff(1)<<","<<returnVal.coeff(2) << endl;
+			f << ip << "," << ratio<<","<<alpha<<","<< postMisfit-initialMisfit <<","<<onePointObjValue/initialOnePointObjValue- 1.0 <<","<<initialMisfit<<","<< postMisfit<<","<<probMaxIncreaseEachObsPoints.maxCoeff() << endl;
+			
+			filename = "EachObsPointsProbIncrease_" + std::to_string(loop) + "_" + std::to_string(ip) + ".txt";
+			output->TxtOutput(&obsPointElements, &probMaxIncreaseEachObsPoints, filename);
 		}
+
 
 
 		for (int ip = 0; ip < locationCalcSettings->numOfSplit; ip++) {
@@ -5173,8 +5507,11 @@ void Analysis::Analysis::RunLocationCalc() {
 			//Update Resis
 			for (int i = 0; i < numOfInvertedResistivityElements; ++i) {
 				invertedRhoIDToElementVector[i]->resistivity -= alpha * dJDRhoOnlyResis.coeff(i) ;
-				if (invertedRhoIDToElementVector[i]->resistivity < 0.0) {
+				if (invertedRhoIDToElementVector[i]->resistivity < minResis) {
 					invertedRhoIDToElementVector[i]->resistivity = minResis;
+				}
+				if (invertedRhoIDToElementVector[i]->resistivity > maxResis) {
+					invertedRhoIDToElementVector[i]->resistivity = maxResis;
 				}
 			}
 
@@ -5203,12 +5540,16 @@ void Analysis::Analysis::RunLocationCalc() {
 				}
 			}
 			//double dFuncVal = CalcMaxImpedanceDataComparedToVarience();
-			Eigen::Vector3d returnVal;
+			/*Eigen::Vector3d returnVal;
 			returnVal = CalcMaxDatafitChangeUsingNormalDistribution();
-			double dFuncVal = returnVal.coeff(0);
+			double dFuncVal = returnVal.coeff(0);*/
+			double postMisfit = CalcDataMisfit(false);
 
 			//Calc Actual moving value for the direction
 			double onePointObjValue = CalcDataMisfit(true);
+
+			//Calc MaxDataMisfit Increase
+			Eigen::VectorXd probMaxIncreaseEachObsPoints = CalcEachObservationProbIncrease();
 
 			//Recover Resis and set for output
 			Eigen::VectorXd diffRho{ numOfInvertedResistivityElements };
@@ -5221,9 +5562,11 @@ void Analysis::Analysis::RunLocationCalc() {
 			output->VTKFileOputput(&invertedRhoIDToElementVector, &diffRho, filename);
 			filename = "Rho_LocationCalc_" + std::to_string(loop) + "_" + std::to_string(locationCalcSettings->numOfSplit+ip) + ".txt";
 			output->TxtOutputResistivity(&elements, filename);
-			f << ip << "," << ratio << "," << alpha << "," << dFuncVal << "," << -onePointObjValue / initialOnePointObjValue + 1.0 << "," << returnVal.coeff(1) << "," << returnVal.coeff(2) << endl;
-			filename = "Sensitivity_" + std::to_string(weightRoughening) + "_" + std::to_string(settings.numOfIteration) + ".vtk";
-			output->VTKFileOputput(&outputSensitivityVector,&dJExceptRoughnessDRho, filename);
+			f << ip << "," << ratio << "," << alpha << "," << postMisfit-initialMisfit << "," << -onePointObjValue / initialOnePointObjValue + 1.0 << "," << initialMisfit << "," <<postMisfit << "," << probMaxIncreaseEachObsPoints.maxCoeff() << endl;
+
+			filename = "EachObsPointsProbIncrease_" + std::to_string(loop) + "_" + std::to_string(locationCalcSettings->numOfSplit + ip) + ".txt";
+			output->TxtOutput(&obsPointElements, &probMaxIncreaseEachObsPoints, filename);
+
 		}
 		f.close();
 
@@ -5260,6 +5603,23 @@ void Analysis::Analysis::SetLocationDataToElement() {
 
 		Element::Element* tmpElement = element;
 		Element::Element* locElement = element;
+
+		bool upsideIsSea = true;
+		while (true) {
+			if (tmpElement->property->type == Property::Property::SEA) {
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1つ深いセルへ
+
+			}
+			else if (upsideIsSea) {
+				upsideIsSea = false;
+				tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 2]; //1つ深いセルへ
+			}
+			else {
+				locElement = tmpElement;
+				break;
+				//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
+			}
+		}
 		//while (true) {
 		//	bool isFoundElement = true;
 		//	for (int i = 0; i < 3; i++) {
@@ -5281,6 +5641,7 @@ void Analysis::Analysis::SetLocationDataToElement() {
 		//		//tmpElement = tmpElement->neighborElements[1 + 3 + 9 * 1]; 
 		//	}
 		//}
+
 
 		for (int i = 0; i < locationData.size(); i++) {
 			Eigen::Vector3d X;
@@ -6243,7 +6604,7 @@ void Analysis::Analysis::ModifyGradient() {
 
 	needCalcCoeffForModifyGradient = false;
 
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
 		dJdRho.coeffRef(i) = dJdRho_pos.coeff(i);
 	}
@@ -6342,3 +6703,149 @@ void Analysis::Analysis::ModifyGradient() {
 //		iterativeSolverVector[i]->useMultiGrid = true;
 //	}
 //}
+
+Eigen::VectorXd Analysis::Analysis::CalcEachObservationProbIncrease() {
+	Eigen::VectorXd probIncreaseEachObs;
+	probIncreaseEachObs.resize(numOfObsPointElements);
+
+	probIncreaseEachObs.setZero();
+	//Impedance Tensor
+	for (int i = 0; i < numOfObsPointElements; i++) {
+		Element::Element* element = obsPointElements[i];
+
+		for (int iOmega = 0; iOmega < boundary->omega.size(); iOmega++) {
+			Eigen::Matrix2cd Zcalc;
+
+
+			if (isInvertedDistortion) {
+				Zcalc = element->distortionMatrix * element->Zpos[iOmega];
+
+			}
+			else {
+				Zcalc = element->Zpos[iOmega];
+
+			}
+			Eigen::Matrix2d fNormalDistriburtionPos;
+			for (int ii = 0; ii < 2; ii++) {
+				for (int jj = 0; jj < 2; jj++) {
+					std::complex<double> dZtmp = Zcalc.coeff(ii, jj) - element->impedanceObsData->ZobsVector[iOmega].coeff(ii, jj);
+					double epsReal = std::abs(element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj));
+					double epsImag = std::abs(element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj));
+
+					if (element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj) > 0) {
+						dZtmp.real(dZtmp.real() / epsReal);
+					}
+					else if (element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj) <= 0) {
+						dZtmp.real(0.0);
+					}
+					else {
+						//そのまま
+					}
+					if (element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj) > 0) {
+						dZtmp.imag(dZtmp.imag() / epsImag);
+					}
+					else if (element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj) <= 0) {
+						dZtmp.imag(0.0);
+					}
+					else {
+						//そのまま
+					}
+
+					fNormalDistriburtionPos.coeffRef(ii, jj) = 1.0 / sqrt(2.0 * ConstantValues::pi) * std::exp(-0.5 * (dZtmp * conj(dZtmp)).real());
+					//Varience is considered as average of epsReal and epsImag
+				}
+			}
+
+			if (isInvertedDistortion) {
+				Zcalc = element->distortionMatrix * element->Zpre[iOmega];
+
+			}
+			else {
+				Zcalc = element->Zpre[iOmega];
+
+			}
+			Eigen::Matrix2d fNormalDistriburtionPre;
+			for (int ii = 0; ii < 2; ii++) {
+				for (int jj = 0; jj < 2; jj++) {
+					std::complex<double> dZtmp = Zcalc.coeff(ii, jj) - element->impedanceObsData->ZobsVector[iOmega].coeff(ii, jj);
+					double epsReal = std::abs(element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj));
+					double epsImag = std::abs(element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj));
+
+					if (element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj) > 0) {
+						dZtmp.real(dZtmp.real() / epsReal);
+					}
+					else if (element->impedanceObsData->varianceZobsVectorReal[iOmega].coeff(ii, jj) <= 0) {
+						dZtmp.real(0.0);
+					}
+					else {
+						//そのまま
+					}
+					if (element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj) > 0) {
+						dZtmp.imag(dZtmp.imag() / epsImag);
+					}
+					else if (element->impedanceObsData->varianceZobsVectorImag[iOmega].coeff(ii, jj) <= 0) {
+						dZtmp.imag(0.0);
+					}
+					else {
+						//そのまま
+					}
+
+					fNormalDistriburtionPre.coeffRef(ii, jj) = 1.0 / sqrt(2.0 * ConstantValues::pi) * std::exp(-0.5 * (dZtmp * conj(dZtmp)).real());
+					//Varience is considered as average of epsReal and epsImag
+
+				}
+			}
+			for (int ii = 0; ii < 2; ii++) {
+				for (int jj = 0; jj < 2; jj++) {
+					probIncreaseEachObs.coeffRef(i) = std::max(probIncreaseEachObs.coeff(i), fNormalDistriburtionPos.coeff(ii, jj) - fNormalDistriburtionPre.coeff(ii, jj));
+				}
+			}
+
+		}
+
+
+
+	}
+	return probIncreaseEachObs;
+}
+
+void Analysis::Analysis::ReadInitialGuess(string filename, Eigen::VectorXcd& resultVector) {
+	try {
+		std::ifstream file(filename);
+		if (!file) {
+			std::cout << "Warning::No Initial Guess File!!!!" << std::endl;
+			return;
+		}
+
+		std::string line;
+		int current = 0;
+		Eigen::VectorXcd readResult;
+		readResult.resize(resultVector.size());
+		readResult.setZero();
+		while (std::getline(file, line)) {
+
+			std::stringstream ss(line);
+			std::string cell;
+			std::vector<double> values;
+
+			while (std::getline(ss, cell, ',')) {
+				try {
+					values.push_back(std::stod(cell));  // 数値に変換
+				}
+				catch (...) {
+					std::cout << "Cannot Read Initial Guess From File!!!!!"  << std::endl;
+					return;
+				}
+			}
+			readResult.coeffRef(current) = std::complex<double>(values[0], values[1]);
+			current++;
+		}
+		for (int i = 0; i < readResult.size(); i++) {
+			resultVector.coeffRef(i) = readResult.coeff(i);
+		}
+	}
+	catch (...) {
+		std::cout << "Cannot Read Initial Guess From File!!!!!"  << std::endl;
+		return;
+	}
+}

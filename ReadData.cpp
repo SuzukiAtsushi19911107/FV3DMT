@@ -160,6 +160,10 @@ std::string ReadData::ReadData::AnalysisTag(std::string tmpLine) {
 			tag = "LocationCalcSettings";
 			break;
 		}
+		else if (strcasecmp("FFTSensitivityAnalysis", tmpWord) == 0) { // 大文字小文字区別せずタグがINVSETTINGSの場合
+			tag = "FFTSensitivityAnalysis";
+			break;
+		}
 		else if (strcasecmp("UncertaintyAnalysisSettings", tmpWord) == 0) { // 大文字小文字区別せずタグがINVSETTINGSの場合
 			tag = "UncertaintyAnalysisSettings";
 			break;
@@ -218,6 +222,11 @@ void ReadData::ReadData::ReadFile(std::string modelFileName, bool forwardCalc) {
 		}
 		if (strcasecmp("LocationCalcSettings", tmpTag) == 0) {
 			AnalysisLocationCalcSettings(&f);
+			std::getline(f, line);
+			continue;
+		}
+		if (strcasecmp("FFTSensitivityAnalysis", tmpTag) == 0) {
+			AnalysisFFTSensitivityAnalysis(&f);
 			std::getline(f, line);
 			continue;
 		}
@@ -478,6 +487,9 @@ void ReadData::ReadData::AnalysisProperties(std::ifstream* f) {
 					}
 					else if (stod(line[1]) == Property::Property::types::FIXED) {
 						property->type = Property::Property::types::FIXED;
+					}
+					else if (stod(line[1]) == Property::Property::types::SEA) {
+						property->type = Property::Property::types::SEA;
 					}
 					else {
 						std::cout << "Wrong Data in Property Type" << std::endl;
@@ -745,7 +757,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 				else if (strcasecmp(line[0].c_str(), "LambdaMin") == 0) {
 					invSettings->modelConstraintMin = stod(line[1]);
 					line = readNext(f);
-				}			
+				}
 				else if (strcasecmp(line[0].c_str(), "NumOfLambda") == 0) {
 					invSettings->numOfCalcModelConstraint = stoi(line[1]);
 					line = readNext(f);
@@ -847,6 +859,16 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					}
 					line = readNext(f);
 				}
+				else if (strcasecmp(line[0].c_str(), "InitialGuessFileForIterativesolver") == 0) {
+					invSettings->initialGuessFile=line[1];
+					line = readNext(f);
+				}
+				else if (strcasecmp(line[0].c_str(), "InitialGuessOutputFileForIterativesolver") == 0) {
+					invSettings->InitialGuessOutputFile = line[1];
+					line = readNext(f);
+					}
+
+
 				else if (strcasecmp(line[0].c_str(), "ToleranceIterativeSolver") == 0) {
 					if (stod(line[1]) < 0.0) {
 						std::cout << "Value ToleranceIterativeSolver must be 0 or more than 0." << std::endl;
@@ -880,12 +902,12 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "maxIterationLineSearch") == 0) {
-				if (stoi(line[1]) < 1) {
-					std::cout << "Value maxIterationLineSearch must be 1 or more than 1." << std::endl;
-					exit(1);
-				}
-				invSettings->maxIterationLineSearch = stoi(line[1]);
-				line = readNext(f);
+					if (stoi(line[1]) < 1) {
+						std::cout << "Value maxIterationLineSearch must be 1 or more than 1." << std::endl;
+						exit(1);
+					}
+					invSettings->maxIterationLineSearch = stoi(line[1]);
+					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "minStep") == 0) {
 					if (stod(line[1]) <= 0.0) {
@@ -922,7 +944,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 						}
 						else if (strcasecmp(line[0].c_str(), "data") == 0) {
 							if (line.size() != 7) {
-								std::cout <<"Data In SettingEachLambda Is Wrong." << std::endl;
+								std::cout << "Data In SettingEachLambda Is Wrong." << std::endl;
 								exit(1);
 							}
 							invSettings->lambdaVector.push_back(stod(line[1]));
@@ -947,10 +969,10 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "minibatches") == 0) {
-				invSettings->minibatches = stoi(line[1]);
-				line = readNext(f);
+					invSettings->minibatches = stoi(line[1]);
+					line = readNext(f);
 				}
-				
+
 				else if (strcasecmp(line[0].c_str(), "RMSSwitchingToGD") == 0) {
 					invSettings->RMSSwitchingToGD = stod(line[1]);
 					if (stod(line[1]) <= 0.0) {
@@ -959,6 +981,14 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					}
 					line = readNext(f);
 				}
+				else if (strcasecmp(line[0].c_str(), "RMSSwitchingToLBFGS") == 0) {
+					invSettings->RMSSwitchingToLBFGS = stod(line[1]);
+					if (stod(line[1]) <= 0.0) {
+						std::cout << "Value RMSSwitchingToLBFGS must be more than zero." << std::endl;
+						exit(1);
+					}
+					line = readNext(f);
+					}
 				else if (strcasecmp(line[0].c_str(), "DistortionInversion") == 0) {
 					if (!strcasecmp("true", line[1].c_str())) {
 						invSettings->isInvertedDistortion = true;
@@ -966,7 +996,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					else {
 						invSettings->isInvertedDistortion = false;
 					}
-						line = readNext(f);
+					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "UseL1Norm") == 0) {
 					if (!strcasecmp("true", line[1].c_str())) {
@@ -985,9 +1015,50 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "safetyFactor") == 0) {
-				invSettings->safetyFactor = stod(line[1]);
-				line = readNext(f);
+					invSettings->safetyFactor = stod(line[1]);
+					line = readNext(f);
 				}
+				else if (strcasecmp(line[0].c_str(), "CalcJustDataMisfit") == 0) {
+					if (!strcasecmp("true", line[1].c_str())) {
+						calcJustDataMisfit = true;
+					}
+					else {
+						calcJustDataMisfit = false;
+					}
+					line = readNext(f);
+				}
+				else if (strcasecmp(line[0].c_str(), "numOfWarmUp") == 0) {
+					invSettings->numWarmUp = stoi(line[1]);
+					if (stoi(line[1]) < 0.0) {
+						std::cout << "Value numOfWarmUp must be more than or equal to zero." << std::endl;
+						exit(1);
+					}
+					line = readNext(f);
+				}
+				else if (strcasecmp(line[0].c_str(), "minIteration") == 0) {
+					invSettings->minIterations = stoi(line[1]);
+					if (stoi(line[1]) < 0.0) {
+						std::cout << "Value minIteration must be more than or equal to zero." << std::endl;
+						exit(1);
+					}
+					line = readNext(f);
+				}
+				else if (strcasecmp(line[0].c_str(), "averageIteration") == 0) {
+					invSettings->averageIterations = stoi(line[1]);
+					if (stoi(line[1]) < 0.0) {
+						std::cout << "Value averageIteration must be more than or equal to zero." << std::endl;
+						exit(1);
+					}
+					line = readNext(f);
+					}
+				else if (strcasecmp(line[0].c_str(), "numTrunc") == 0) {
+					invSettings->numTrunc = stoi(line[1]);
+					if (stoi(line[1]) < 0.0) {
+						std::cout << "Value numTrunc must be more than or equal to zero." << std::endl;
+						exit(1);
+					}
+					line = readNext(f);
+					}
 				else {
 					std::cout << "Wrong Data in Parameters:" << line[0].c_str()<< std::endl;
 					exit(1);
@@ -1224,8 +1295,8 @@ void ReadData::ReadData::AnalysisLocationCalcSettings(std::ifstream* f) {
 		}
 		else if (strcasecmp(line[0].c_str(), "widthRatio") == 0) {
 			locationCalcSettings->widthImpedance = stod(line[1]);
-			if (locationCalcSettings->widthImpedance <= 0.0) {
-				std::cout << "widthRatio In Location Calc Settings File must be between more than 0." << std::endl;
+			if (locationCalcSettings->widthImpedance <= 1.0) {
+				std::cout << "widthRatio In Location Calc Settings File must be equal to or more than 1." << std::endl;
 				exit(1);
 			}
 			line = readNext(f);
@@ -1233,13 +1304,9 @@ void ReadData::ReadData::AnalysisLocationCalcSettings(std::ifstream* f) {
 		else if (strcasecmp(line[0].c_str(), "numOfSplit") == 0) {
 			locationCalcSettings->numOfSplit = stoi(line[1]);
 			if (locationCalcSettings->numOfSplit<=0) {
-				std::cout << "numOfSplit In Location Calc Settings File must be between more than 0." << std::endl;
+				std::cout << "numOfSplit In Location Calc Settings File must be equal to or more than 1." << std::endl;
 				exit(1);
 			}
-			line = readNext(f);
-		}
-		else if (strcasecmp(line[0].c_str(), "numOfSplit") == 0) {
-			locationCalcSettings->numOfSplit = stoi(line[1]);
 			line = readNext(f);
 		}
 		else if (strcasecmp(line[0].c_str(), "ResistivityFile") == 0) {
@@ -1407,4 +1474,198 @@ size_t ReadData::HashFromCoordToSize_t::operator()(const Eigen::Vector3d& x) con
 	size_t result;
 	sstream >> result;
 	return result;
+}
+void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
+
+	std::vector<std::string> line = readNext(f);
+	isFFTSensitivityMode = true;
+
+	while (true) {
+		if (strcasecmp(line[0].c_str(), "END") == 0) {
+
+			if (strcasecmp(line[1].c_str(), "FFTSensitivityAnalysis") == 0) {
+				break;
+
+			}
+		}
+		else if (strcasecmp(line[0].c_str(), "attenuation") == 0) {
+			attenuation = stod(line[1]);
+			if (attenuation <= 0.0) {
+				std::cout << "attenuation must be equal to or more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Nx") == 0) {
+			Nx = stoi(line[1]);
+			if (Nx <= 0.0) {
+				std::cout << "Nx must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Ny") == 0) {
+			Ny = stoi(line[1]);
+			if (Ny <= 0.0) {
+				std::cout << "Ny must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Nz") == 0) {
+			Nz = stoi(line[1]);
+			if (Nz <= 0.0) {
+				std::cout << "Nz must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "K") == 0) {
+			K = stoi(line[1]);
+			if (K <= 0.0) {
+				std::cout << "K must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindow") == 0) {
+			cells_window = stoi(line[1]);
+			if (cells_window <= 0.0) {
+				std::cout << "cellsWindow must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "numEnsemble") == 0) {
+			numEnsemble = stoi(line[1]);
+			if (numEnsemble <= 0.0) {
+				std::cout << "numEnsemble must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "rangeX") == 0) {
+			minX = stod(line[1]);
+			maxX = stod(line[2]);
+			if (minX >= maxX) {
+				std::cout << "minX must be less than maxX." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "rangeY") == 0) {
+			minY = stod(line[1]);
+			maxY = stod(line[2]);
+			if (minY >= maxY) {
+				std::cout << "minY must be less than maxY." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "rangeZ") == 0) {
+			minZ = stod(line[1]);
+			maxZ = stod(line[2]);
+			if (minZ >= maxZ) {
+				std::cout << "minZ must be less than maxZ." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsR") == 0) {
+			epsR = stod(line[1]);
+			if (epsR <= 0.0) {
+				std::cout << "epsR must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsT") == 0) {
+			epsT = stod(line[1]);
+			if (epsT <= 0.0) {
+				std::cout << "epsT must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "usePreviousResult") == 0) {
+			if (!strcasecmp("false", line[1].c_str())) {
+				usePreviousResult = false;
+			}
+			else {
+				usePreviousResult = true;
+			}
+			line = readNext(f);
+			}
+		else if (strcasecmp(line[0].c_str(), "epsWindow") == 0) {
+			eps_window = stod(line[1]);
+			if (eps_window <= 0.0) {
+				std::cout << "epsWindow must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "lambda") == 0) {
+			lambda = stod(line[1]);
+			if (lambda <= 0.0) {
+				std::cout << "lambda must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "confidenceLevels") == 0) {
+			confidenceLevel1 = stod(line[1]);
+			confidenceLevel2 = stod(line[2]);
+			if (confidenceLevel1 < 0.0 || confidenceLevel1>1) {
+				std::cout << "confidenceLevel1 must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			if (confidenceLevel2 < 0.0 || confidenceLevel2>1) {
+				std::cout << "confidenceLevel2 must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			if (confidenceLevel1 < confidenceLevel2) {
+				std::cout << "confidenceLevel1 must be more than confidenceLevel2." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "orthogonalizationMethod") == 0) {
+			if (strcasecmp(line[0].c_str(), "gd") == 0) {
+				orthogonalize = "gd";
+			}
+			else if (strcasecmp(line[0].c_str(), "both") == 0) {
+				orthogonalize = "both";
+			}
+			else {
+				orthogonalize = "objectiveFunction";
+			}
+			line = readNext(f);
+			}
+		else if (strcasecmp(line[0].c_str(), "InitialResistivityFile") == 0) {
+			ReadInitialResistivityData(line[1]);
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "InitialDistortionFile") == 0) {
+			ReadInitialDistortionData(line[1]);
+			line = readNext(f);
+		}
+
+		else if (strcasecmp(line[0].c_str(), "ImpedanceFile") == 0) {
+			invSettings->impedanceFile = line[1];
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "TipperFile") == 0) {
+			invSettings->tipperFile = line[1];
+			line = readNext(f);
+		}
+
+		else {
+			std::cout << "Wrong Data in FFTSensitivityAnalysis" << std::endl;
+			exit(1);
+		}
+		if (f->eof()) {
+			std::cout << "No END FFTSensitivityAnalysis In Data" << std::endl;
+			exit(1);
+		}
+	}
 }

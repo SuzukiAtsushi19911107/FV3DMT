@@ -56,6 +56,8 @@ namespace Element {
 		double rhoYX = 0;
 		double phiXY = 0;
 		double phiYX = 0;
+		double dDataMisfitDRho = 0.0;
+		double dRoughnessTermDRho = 0.0;
 		int calcID; //全体の係数行列の行数に使う
 		bool isParent;
 		bool isObservationElement = false;

@@ -73,6 +73,7 @@ namespace InvSettings {
 		int minibatches = 1;
 
 		double RMSSwitchingToGD = -1;
+		double RMSSwitchingToLBFGS = -1;
 		bool isInvertedDistortion = true;
 
 		bool useL1Norm = false;
@@ -91,7 +92,17 @@ namespace InvSettings {
 		double axForModifyGradient = 1.0;
 
 		double ayForModifyGradient = 1.0;
+		int numWarmUp = 5;
+		int minIterations = 10;
+		int averageIterations = 5;
+		int numTrunc = 5;
 
+		std::string initialGuessFile = "None";
+		std::string InitialGuessOutputFile = "None";
+
+		double epsRatio = 0.1;
+		double eps_modelConstraint = 0.;
+		double eps_distortionConstraint = 0.;
 		std::vector<std::string> split(std::string str);
 		std::vector<std::string> readNext(std::ifstream* f);
 		void ReadManualSettingData(optim::algo_settings_t *settings);

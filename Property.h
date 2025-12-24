@@ -22,7 +22,7 @@ namespace Property {
 		Property();
 		int ID = -1;
 		double resistivity;
-		enum types {NORMAL,AIR,FIXED}; //type 0:normal 1:air 2:fixed
+		enum types {NORMAL,AIR,FIXED,SEA}; //type 0:normal 1:air 2:fixed
 		types type;
 
 		double density = -1.0;

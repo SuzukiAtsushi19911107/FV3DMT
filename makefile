@@ -46,4 +46,6 @@ UncertaintyAnalysis.o: UncertaintyAnalysis.cpp
 	$(CC) -c UncertaintyAnalysis.cpp $(INCB) $(INCE) $(INCO) $(INCK)  $(FLAGS)
 UnstructuredElement.o: UnstructuredElement.cpp
 	$(CC) -c UnstructuredElement.cpp $(INCB) $(INCE) $(INCO) $(INCK)  $(FLAGS)
+FFTSensitivityAnalysis.o: FFTSensitivityAnalysis.cpp
+	$(CC) -c FFTSensitivityAnalysis.cpp $(INCB) $(INCE) $(INCO) $(INCK)  $(FLAGS)
 	
