@@ -11,9 +11,6 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <Eigen/Dense>
 
 
-namespace Function {
-	class Function;
-}
 
 
 namespace Property {
@@ -25,13 +22,5 @@ namespace Property {
 		enum types {NORMAL,AIR,FIXED,SEA}; //type 0:normal 1:air 2:fixed
 		types type;
 
-		double density = -1.0;
-		double specificHeat = -1.0;
-		int conductivityFuncID = -1;
-		Function::Function* conductivityFunction;
-		int densityFuncID = -1;
-		Function::Function* densityFunction;
-		int specificHeatFuncID = -1;
-		Function::Function* specificHeatFunction;
 	};
 }

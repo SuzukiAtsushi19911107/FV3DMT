@@ -35,6 +35,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <random>
 #include <filesystem>
 #include <iostream>
+#include "Functions.h"
 namespace fs = std::filesystem;
 //#define MI_MALLOC_OVERRIDE
 //#include <mimalloc.h>

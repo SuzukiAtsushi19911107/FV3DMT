@@ -30,10 +30,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include "LocationData.h"
 #include "UncertaintyAnalysis.h"
 namespace ub = boost::numeric::ublas;
-namespace Functions {
-	std::string GetNeighborElement(std::unordered_map<std::string, Element::Element*>* elements, Element::Element* element, Eigen::Vector3i val ,int nx,int ny,int nz);
-	std::string GetBinaryValue(int i, int j);
-}
+
 
 
 namespace Analysis {
