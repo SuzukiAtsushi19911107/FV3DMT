@@ -34,5 +34,8 @@ namespace Output {
 		void OutputDistortionMatrixForRestart(std::vector<Element::Element*>* obsImpedanceElements, std::string filename = "distortionForRestart.txt");
 		void VTKFileOputput(std::vector< Element::Element*>* calcElements, Eigen::VectorXd* values, string outputFile = "None");
 		void VTKObsPointsFileOutput(std::vector< Element::Element*>* obsPointsElements,  string outputFile = "ObsPoints.vtk");
+		void OutputGradObjFunc(double obj_val,std::vector< Element::Element*>* invertedRhoIDToElementVector, Eigen::MatrixXd* grad_out, string filename);
+		void TxtOutput(std::vector< Element::Element*>* calcElements, Eigen::VectorXd* values, string outputFile);
+		void OutputInitialGuessFile(string filename, Eigen::VectorXcd& resultVector);
 	};
 }

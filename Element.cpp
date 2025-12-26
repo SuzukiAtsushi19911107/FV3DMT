@@ -1,7 +1,8 @@
-/*
+﻿/*
 FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
 */
 #pragma once
+
 #include <iostream>
 #include <vector>
 #include <Eigen/SparseCore>
@@ -18,6 +19,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <kv/autodif.hpp>
 #include <kv/complex.hpp>
 #include "Node.h"
+
 namespace ub = boost::numeric::ublas;
 using namespace std;
 void Element::Element::InitializeHAndEAndZ(int nOmega) {
@@ -94,7 +96,7 @@ void Element::Element::SetNeighborElements(unordered_map<string, Element*> *elem
 				string neighborID=Functions::GetNeighborElement(elements, this, tmp,nx,ny,nz);
 				int ipos = (tmp.coeff(0) + 1) + 3 * (tmp.coeff(1) + 1) + 9 * (tmp.coeff(2) + 1);
 				if (ipos >= 0 && ipos < 27) {
-					alreadyFoundNeighborID[ipos] = neighborID; //�o�^
+					alreadyFoundNeighborID[ipos] = neighborID; //登録
 					if ((*elements).count(neighborID) != 0) {
 						neighborElements[ipos] = (*elements)[neighborID];
 					}
@@ -108,13 +110,13 @@ void Element::Element::SetNeighborElements(unordered_map<string, Element*> *elem
 }
 template<typename Scalar>
 void Element::Element::CalcInterpolationInElementCoeff(Eigen::Vector3i val, Eigen::Vector3d x0, unordered_map < string, Element* >* elements, int numCalcElements, Eigen::SparseMatrix<Scalar, Eigen::RowMajor>* resisCoeff) {
-	//val�����̗אڃZ�����̒l���Ԃ���B
+	//val方向の隣接セル内の値を補間する。
 	vector<Eigen::SparseMatrix<Scalar, Eigen::RowMajor> > relatedElementsRho;
 	vector < Eigen::Vector3d> relatedElementsCenterCoord;
 	Eigen::Vector3i pos;
 	pos.setZero();
 	unordered_map<string, Element*> nodeElementsDict;
-	nodeElementsDict.reserve(100); //100�͓K��
+	nodeElementsDict.reserve(100); //100は適当
 	string neighborIDVirtual = Functions::GetVirturalNeighborElement(elements, ID, layer, val, nx, ny, nz);
 	for (int i = 0; i < 4; i++) {
 		pos.setZero();
@@ -297,7 +299,7 @@ void Element::Element::CalcSurfaceResistivity(unordered_map<string, Element*>* e
 
 					// Calc Rho For Foward Calc
 					if (layer == neighborElements[ipos]->layer) {
-						double w1 = dx; //�d�݂���ł悢�H�v����
+						double w1 = dx; //重みこれでよい？要検討
 						double w2 = neighborElements[ipos]->dx;
 						if (neighborElements[ipos]->isParent == true) {
 							w2 = w2 / 2.0; //assumed that the layer difference is one,not more than one.
@@ -576,7 +578,7 @@ void Element::Element::CalcE(Eigen::SparseMatrix<std::complex< double >, Eigen::
 	tmpE.coeffRef(0) = 0.5/(int(numOfCalcSurfaceForE/3)) * tmpE.coeff(0);
 	tmpE.coeffRef(1) = 0.5 / (int(numOfCalcSurfaceForE / 3)) * tmpE.coeff(1);
 	tmpE.coeffRef(2) = 0.25 * tmpE.coeff(2);
-	//tmpE = 0.25* tmpE;//���ׂĂ̖ʍ��v�łS�񓯈����������������
+	//tmpE = 0.25* tmpE;//すべての面合計で４回同一方向成分を持つため
 	//tmpE = tmpE / sumWeight;
 
 	//tmpE.eval();
@@ -638,7 +640,7 @@ void Element::Element::CalcE(Eigen::VectorXcd* Hresult, unordered_map<string, El
 	tmpE.coeffRef(0) = 0.5/ (int(numOfCalcSurfaceForE / 3)) * tmpE.coeff(0);
 	tmpE.coeffRef(1) = 0.5/ (int(numOfCalcSurfaceForE / 3)) * tmpE.coeff(1);
 	tmpE.coeffRef(2) = 0.25 * tmpE.coeff(2);
-	//tmpE = 0.25* tmpE;//���ׂĂ̖ʍ��v�łS�񓯈����������������
+	//tmpE = 0.25* tmpE;//すべての面合計で４回同一方向成分を持つため
 	//tmpE = tmpE / sumWeight;
 
 	//tmpE.eval();
@@ -1797,7 +1799,7 @@ std::tuple<Eigen::SparseMatrix<double, Eigen::RowMajor>, double,string> Element:
 
 
 Eigen::SparseMatrix<double, Eigen::RowMajor> Element::Element::CalcInterpolatedVectorInElement(Eigen::Vector3i val, Eigen::Vector3d x0, unordered_map < string, Element* > *elements, int numChildElements) {
-	//val�����̗אڃZ�����̒l���Ԃ���B
+	//val方向の隣接セル内の値を補間する。
 
 	//vector < Eigen::Vector3d> xNode;
 	//vector<Eigen::SparseMatrix < double, Eigen::RowMajor >>nodeVal;
@@ -1805,7 +1807,7 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> Element::Element::CalcInterpolatedV
 	//for (int i = 0; i < 8; i++) {
 	//	Eigen::Vector3d tmp = Eigen::Vector3d::Zero();
 	//	Eigen::SparseMatrix<double, Eigen::RowMajor> tmpM{ 3, 3 * numChildElements };
-	//	tmpM.reserve(243*100);// 100��safetyfactor
+	//	tmpM.reserve(243*100);// 100はsafetyfactor
 	//	nodeVal.push_back(tmpM);
 	//	xNode.push_back(tmp);
 	//}
@@ -1816,7 +1818,7 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> Element::Element::CalcInterpolatedV
 	Eigen::Vector3i pos;
 	pos.setZero();
 	unordered_map<string, Element*> nodeElementsDict;
-	nodeElementsDict.reserve(100); //100�͓K��
+	nodeElementsDict.reserve(100); //100は適当
 	string neighborIDVirtual = Functions::GetVirturalNeighborElement(elements, ID, layer, val, nx, ny, nz);
 	for (int i = 0; i < 6; i++) {
 		pos.setZero();
@@ -1862,13 +1864,13 @@ Eigen::SparseMatrix<double, Eigen::RowMajor> Element::Element::CalcInterpolatedV
 }
 
 double Element::Element::CalcInterpolatedRhoInElement(Eigen::Vector3i val, Eigen::Vector3d x0, unordered_map < string, Element* >* elements, int numChildElements) {
-	//val�����̗אڃZ�����̒l���Ԃ���B
+	//val方向の隣接セル内の値を補間する。
 	vector<double> relatedElementsRho;
 	vector < Eigen::Vector3d> relatedElementsCenterCoord;
 	Eigen::Vector3i pos;
 	pos.setZero();
 	unordered_map<string, Element*> nodeElementsDict;
-	nodeElementsDict.reserve(100); //100�͓K��
+	nodeElementsDict.reserve(100); //100は適当
 	string neighborIDVirtual = Functions::GetVirturalNeighborElement(elements, ID, layer, val, nx, ny, nz);
 	for (int i = 0; i < 6; i++) {
 		pos.setZero();
@@ -2207,7 +2209,7 @@ Eigen::Vector3cd Element::Element::CalcDEDH(int derID, int numOfCalcElements, un
 	dEdH.coeffRef(0) = 0.5 /(int(numOfCalcSurfaceForE/3)) * dEdH.coeff(0);
 	dEdH.coeffRef(1) = 0.5 /(int(numOfCalcSurfaceForE/3)) * dEdH.coeff(1);
 	dEdH.coeffRef(2) = 0.25 * dEdH.coeff(2);
-	//tmpE = 0.25* tmpE;//���ׂĂ̖ʍ��v�łS�񓯈����������������
+	//tmpE = 0.25* tmpE;//すべての面合計で４回同一方向成分を持つため
 	//tmpE = tmpE / sumWeight;
 
 	//tmpE.eval();
@@ -2218,7 +2220,7 @@ Eigen::Vector3cd Element::Element::CalcDEDH(int derID, int numOfCalcElements, un
 
 void Element::Element::CalcDZDH(const ub::vector< kv::complex<double>>* HTwoItr, unordered_map<string, Element*>* elements, int numOfCalcElements,int iOmega) {
 	int numOfCalcHComponentsPerOneItr = 3* numOfCalcElements;
-	//���x�N�g����autodif���v�Z����ƃ�������H��������̂ŁAindex�ƒl��ۑ�
+	//密ベクトルでautodifを計算するとメモリを食いすぎるので、indexと値を保存
 	ub::vector<kv::autodif<kv::complex<double>>>HtwoItrSparse;
 	std::vector<int>nonZeroRowIndices;
 	//count num of nonzero
@@ -2392,7 +2394,7 @@ ub::matrix<kv::autodif<kv::complex<double>>> Element::Element::CalcDEDH(ub::vect
 	return tmpE;
 }
 void Element::Element::CalcDZDRho(const ub::vector<kv::complex<double>>* rhoVecUb, const ub::vector<kv::complex<double>>* HresultTwoItr,const vector<Element*>* calcElementsVector,const int numOfCalcElements,const int iOmega) {
-	//���x�N�g����autodif���v�Z����ƃ�������H��������̂ŁAindex�ƒl��ۑ�
+	//密ベクトルでautodifを計算するとメモリを食いすぎるので、indexと値を保存
 	ub::vector<kv::autodif<kv::complex<double>>>rhoVecSparse;
 	std::vector<int>nonZeroRowIndices;
 	//count num of nonzero
@@ -2549,7 +2551,7 @@ ub::matrix<kv::autodif<kv::complex<double>>> Element::Element::CalcDEDRho(ub::ve
 void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std::string, Element*>* elements, const ub::vector<complex<double>>* rhoVec,
 	const vector<Eigen::VectorXcd>* HresultTwoItr,const vector<Element*>* calcElementsVector,
 	const int numOfCalcElements, const int numOfInvertedResisElem, const Eigen::VectorXcd* lambdaEachOmega, Eigen::VectorXcd* lambdaDRDRho) {
-	//���x�N�g����autodif���v�Z����ƃ�������H��������̂ŁAindex�ƒl��ۑ�
+	//密ベクトルでautodifを計算するとメモリを食いすぎるので、indexと値を保存
 	ub::vector<kv::autodif<complex<double>>>rhoVecSparse;
 	
 	if (boundary != "NOT_BOUNDARY") {
@@ -2657,7 +2659,7 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 			//	for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(rotHdS[i], j); it; ++it) {
 			//		int iCol = it.col();
 			//		int iRow = it.row();
-			//		//n�~�ρށ~HdS
+			//		//n×ρ∇×HdS
 			//		if (iRow == 0) {
 			//				dSumNCrossRhoRotHdSRhoSparse(1) += rho * (pos.coeff(2)*kv::complex<double>(rotHdS[i].coeff(iRow, iCol).real(), rotHdS[i].coeff(iRow, iCol).imag())*(*HresultTwoItr)(itr * 3 * numOfCalcElements + iCol));
 			//				dSumNCrossRhoRotHdSRhoSparse(2) += -rho * (pos.coeff(1)*kv::complex<double>(rotHdS[i].coeff(iRow, iCol).real(), rotHdS[i].coeff(iRow, iCol).imag())*(*HresultTwoItr)(itr * 3 * numOfCalcElements + iCol));
@@ -3810,75 +3812,84 @@ bool Element::Element::CheckThePointInside(Eigen::Vector3d p) {
 	return isInside;
 }
 bool Element::Element::CheckThePointInside2D(Eigen::Vector3d p, int iSurf) {
-	bool isInside = true;
-	vector<Node::Node*> surfNodes(4);
-	int componentConsideredAsZero = -1;
-	if (iSurf == 0) { //-X
-		surfNodes[0] = nodes[0];
-		surfNodes[1] = nodes[3];
-		surfNodes[2] = nodes[7];
-		surfNodes[3] = nodes[4];
-		componentConsideredAsZero = 0;
-	}
-	else if (iSurf == 1) { //+X
-		surfNodes[0] = nodes[1];
-		surfNodes[1] = nodes[2];
-		surfNodes[2] = nodes[6];
-		surfNodes[3] = nodes[5];
-		componentConsideredAsZero = 0;
-	}
-	else if (iSurf == 2) { //-Y
-		surfNodes[0] = nodes[0];
-		surfNodes[1] = nodes[1];
-		surfNodes[2] = nodes[5];
-		surfNodes[3] = nodes[4];
-		componentConsideredAsZero = 1;
-	}
-	else if (iSurf == 3) { //+Y
-		surfNodes[0] = nodes[2];
-		surfNodes[1] = nodes[3];
-		surfNodes[2] = nodes[7];
-		surfNodes[3] = nodes[6];
-		componentConsideredAsZero = 1;
-	}
-	else if (iSurf == 4) { //-Z
-		surfNodes[0] = nodes[0];
-		surfNodes[1] = nodes[1];
-		surfNodes[2] = nodes[2];
-		surfNodes[3] = nodes[3];
-		componentConsideredAsZero = 2;
-	}
-	else if (iSurf == 5) { //+Z
-		surfNodes[0] = nodes[4];
-		surfNodes[1] = nodes[5];
-		surfNodes[2] = nodes[6];
-		surfNodes[3] = nodes[7];
-		componentConsideredAsZero = 2;
-	}
+	std::array<Node::Node*, 4> surf{};
+	int drop = -1; // 0:x, 1:y, 2:z を落として 2D にする
+	if (iSurf == 0) { surf = { nodes[0],nodes[3],nodes[7],nodes[4] }; drop = 0; } // -X
+	else if (iSurf == 1) { surf = { nodes[1],nodes[2],nodes[6],nodes[5] }; drop = 0; } // +X
+	else if (iSurf == 2) { surf = { nodes[0],nodes[1],nodes[5],nodes[4] }; drop = 1; } // -Y
+	else if (iSurf == 3) { surf = { nodes[2],nodes[3],nodes[7],nodes[6] }; drop = 1; } // +Y
+	else if (iSurf == 4) { surf = { nodes[0],nodes[1],nodes[2],nodes[3] }; drop = 2; } // -Z
+	else if (iSurf == 5) { surf = { nodes[4],nodes[5],nodes[6],nodes[7] }; drop = 2; } // +Z
+	else return false;
 
-	Eigen::Vector3d vec1 = surfNodes[1]->x - surfNodes[0]->x;
-	vec1.coeffRef(componentConsideredAsZero) = 0.0;
-	Eigen::Vector3d vec2 = p - surfNodes[0]->x;
-	vec2.coeffRef(componentConsideredAsZero) = 0.0;
-	Eigen::Vector3d plusMinusVec = vec1.cross(vec2);
-	if (plusMinusVec.norm() < 1e-30) {
-		if (vec1.dot(vec2) / vec1.dot(vec1) >= 0.0 && vec1.dot(vec2) / vec1.dot(vec1) <= 1.0) { //on the line
-			return true;
+	auto to2 = [drop](const Eigen::Vector3d& a)->Eigen::Vector2d {
+		if (drop == 0) return { a.y(), a.z() };
+		if (drop == 1) return { a.x(), a.z() };
+		/*drop==2*/   return { a.x(), a.y() };
+		};
+
+	Eigen::Vector2d q[4] = {
+		to2(surf[0]->x), to2(surf[1]->x), to2(surf[2]->x), to2(surf[3]->x)
+	};
+	Eigen::Vector2d pt = to2(p);
+
+	// 2) スケールに応じたトレランス
+	double L = 0.0;
+	for (int i = 0; i < 4; i++) {
+		L = std::max(L, (q[(i + 1) & 3] - q[i]).norm());
+	}
+	// 長さ・面積の各トレランス（必要に応じて係数は調整）
+	const double tol_len = 1e-9 * (1.0 + L);
+	const double tol_area = 1e-12 * (1.0 + L * L);
+
+	auto orient2d = [](const Eigen::Vector2d& a,
+		const Eigen::Vector2d& b,
+		const Eigen::Vector2d& c)->double {
+			// 有向面積の2倍（(b-a)×(c-a) の z 成分）
+			Eigen::Vector2d ab = b - a, ac = c - a;
+			return ab.x() * ac.y() - ab.y() * ac.x();
+		};
+
+	auto onSegment = [&](const Eigen::Vector2d& a,
+		const Eigen::Vector2d& b,
+		const Eigen::Vector2d& c)->bool {
+			// c が線分 ab 上か（距離と射影tで判定）: 境界は内側扱い
+			Eigen::Vector2d ab = b - a, ac = c - a;
+			double ab2 = ab.squaredNorm();
+			if (ab2 <= tol_len * tol_len) {
+				// 退化（a≈b）: 点一致で判断
+				return (ac.norm() <= tol_len);
+			}
+			double t = ab.dot(ac) / ab2;                  // a→b への射影係数
+			if (t < -1e-9 || t > 1.0 + 1e-9) return false;  // わずかなはみ出しは許容せず
+			Eigen::Vector2d proj = a + t * ab;
+			double d = (c - proj).norm();
+			return (d <= tol_len);
+		};
+
+	int sign0 = 0; // 最初に現れた有向面積の符号（+1/-1）
+	for (int i = 0; i < 4; i++) {
+		const Eigen::Vector2d& a = q[i];
+		const Eigen::Vector2d& b = q[(i + 1) & 3];
+
+		double s = orient2d(a, b, pt);
+
+		// ほぼ辺上（エッジに対して共線）なら、線分上かチェック
+		if (std::abs(s) <= tol_area) {
+			if (onSegment(a, b, pt)) return true; // 境界は内側
+			// 共線だが線分外 → この辺では外の可能性あり。次の辺へ続行して最終判定
+			continue;
 		}
-		else {
+
+		int sgn = (s > 0.0) ? 1 : -1;
+		if (sign0 == 0) sign0 = sgn;
+		else if (sgn != sign0) {
+			// 1本でも反対向き → 多角形外
 			return false;
 		}
 	}
-	for (int i = 1; i < 4; i++) {
-		vec1 = surfNodes[(i + 1) % 4]->x - surfNodes[i]->x;
-		vec1.coeffRef(componentConsideredAsZero) = 0.0;
-		vec2 = p - surfNodes[i]->x;
-		vec2.coeffRef(componentConsideredAsZero) = 0.0;
-		if (plusMinusVec.dot(vec1.cross(vec2)) < 0.0) {
-			isInside = false;
-		}
-	}
-	return isInside;
+	// すべてのエッジで符号が矛盾しなかった → 内側（または頂点付近）
+	return true;
 }
 void Element::Element::CalcSurfaceAndVolume() {
 

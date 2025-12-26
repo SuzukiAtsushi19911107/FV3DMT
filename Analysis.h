@@ -30,10 +30,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include "LocationData.h"
 #include "UncertaintyAnalysis.h"
 namespace ub = boost::numeric::ublas;
-namespace Functions {
-	std::string GetNeighborElement(std::unordered_map<std::string, Element::Element*>* elements, Element::Element* element, Eigen::Vector3i val ,int nx,int ny,int nz);
-	std::string GetBinaryValue(int i, int j);
-}
+
 
 
 namespace Analysis {
@@ -49,7 +46,7 @@ namespace Analysis {
 		double maxResis = 1e5; //This should be given as input
 		double thresholdRMS = 1.;
 		double RMScur = 1e30;
-		double weightRoughening;
+		double weightRoughening = -1;
 		double weightRougheningForDistortion = 10;
 		Analysis(ReadData::ReadData* readData);
 		std::unordered_map<std::string, Element::Element*> elements;
@@ -82,7 +79,7 @@ namespace Analysis {
 		Eigen::VectorXd dUdRho;
 		Eigen::SparseMatrix<double , Eigen::RowMajor>* modelWeightMatrix;
 		Eigen::VectorXd dRhoDParam;
-
+		Eigen::MatrixXd dUdRho_output;
 		Eigen::MatrixXd* jacobian;
 		//vector<vector<Eigen::VectorXcd, Eigen::aligned_allocator<Eigen::VectorXcd>>> globalVectorEachThread;
 
@@ -157,6 +154,7 @@ namespace Analysis {
 		Eigen::SparseMatrix<double,Eigen::RowMajor>* rougheningMatrix;
 		optim::algo_settings_t settings;
 		double obj_valPre=1e30;
+		double obj_valNotNormalized = 0.0;
 		std::vector<Element::Element*> notBoundaryElements;
 		Eigen::VectorXcd lambdaDRDRho;
 		time_t startCalc_t = time(NULL);
@@ -224,6 +222,36 @@ namespace Analysis {
 
 		bool needCalcCoeffForModifyGradient = true;
 
+		bool calcJustDataMisfit = false;
+
+
+		//for FFTSensitivityAnalysis
+		double attenuation = 0.1;
+		int Nx = 51;
+		int Ny = 51;
+		int Nz = 51;
+		int K = 25;
+		int cells_window = 3;
+		int numEnsemble = 100;
+
+		double minX = -10000;
+		double maxX = 10000;
+		double minY = -10000;
+		double maxY = 10000;
+		double minZ = -10000;
+		double maxZ = 10000;
+
+		double epsR = 0.1;
+		double epsT = 0.0;
+		double eps_window = 0.;
+		double confidenceLevel1 = 0.05; //For line search to seek the solution within these values
+		double confidenceLevel2 = 0.01;
+		double initWidth = 0.1;
+		double lambdaForFFT = -1.0;
+		bool usePreviousResult = false;
+		Eigen::VectorXcd resultVector_init;
+		string orthogonalize = "objectiveFunction";
+		bool FFTSensitivityMode = false;
 		//bool useMultGrid = false;
 
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -307,6 +335,15 @@ namespace Analysis {
 		void ModifyGradient();
 
 		void SetMultiGridPreconditioner();
+
+		Eigen::VectorXd CalcEachObservationProbIncrease();
+
+		void ReadInitialGuess(string file, Eigen::VectorXcd& resultVector);
+
+		
+		//for FFTSensitivityAnalysis
+		void RunFFTSensitivityAnalysis();
+		double RunFowardCalc(std::vector<double> x,bool isCalcGradient=false);
 
 	};
 }

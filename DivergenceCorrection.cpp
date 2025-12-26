@@ -2,6 +2,7 @@
 FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
 */
 #pragma once
+
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 #include "optim.hpp"
 #include <iostream>
@@ -46,7 +47,8 @@ void DivergenceCorrection::DivergenceCorrection::initialize(unordered_map<string
 	vector<int> locationPushBackForDiv(omp_get_max_threads());
 	vector<int> locationPushBackForGrad(omp_get_max_threads());
 	for (int i = 0; i < omp_get_max_threads(); i++) {
-		divGradMatrixTripletEachThread[i].resize(int(m_calcElementsVector->size() * 1000 / omp_get_max_threads())); //100 per row as average as enough value
+		// Reserve only: avoid default-constructing a huge number of Triplets.
+		divGradMatrixTripletEachThread[i].reserve(int(m_calcElementsVector->size() * 1000 / omp_get_max_threads())); // ~1000 per row as a rough upper bound
 		//gradOperatorMatrixTripletEachThread[i].resize(int(3 * m_calcElementsVector->size() * 1000 / omp_get_max_threads()));
 		//divergenceOperatorMatrixTripletEachThread[i].resize(int(3 * m_calcElementsVector->size() * 1000 / omp_get_max_threads()));
 		locationPushBackForDivGrad[i] = 0;
@@ -121,29 +123,25 @@ void DivergenceCorrection::DivergenceCorrection::initialize(unordered_map<string
 	}
 	
 
-	//assemble
+	// assemble
 	vector<int> numVal(3);
 	numVal[0] = 0;
 	numVal[1] = 0;
 	numVal[2] = 0;
 	for (int i = 0; i < omp_get_max_threads(); i++) {
-		numVal[0]+=divGradMatrixTripletEachThread[i].size();
-		//numVal[1] += gradOperatorMatrixTripletEachThread[i].size();
-		//numVal[2] += divergenceOperatorMatrixTripletEachThread[i].size();
+		numVal[0] += static_cast<int>(divGradMatrixTripletEachThread[i].size());
+		//numVal[1] += static_cast<int>(gradOperatorMatrixTripletEachThread[i].size());
+		//numVal[2] += static_cast<int>(divergenceOperatorMatrixTripletEachThread[i].size());
 	}
-	vector< Eigen::Triplet<double>> divGradMatrixTriplet(numVal[0]); 
-	vector< Eigen::Triplet<double>> gradOperatorMatrixTriplet(numVal[1]);
-	vector< Eigen::Triplet<double>> divergenceOperatorMatrixTriplet(numVal[2]);
+	vector< Eigen::Triplet<double>> divGradMatrixTriplet;
+	divGradMatrixTriplet.reserve(numVal[0]);
 	cout << "     Making matrix From Triplets..." << endl;
 
-	numVal[0] = 0;
-	numVal[1] = 0;
-	numVal[2] = 0;
 	for (int i = 0; i < omp_get_max_threads(); i++) {
-		for (int j = 0; j < locationPushBackForDivGrad[i]; j++) {
-			divGradMatrixTriplet[numVal[0]]=divGradMatrixTripletEachThread[i][j];
-			numVal[0]++;
-		}
+		// size() already reflects the number of Triplets actually pushed.
+		divGradMatrixTriplet.insert(divGradMatrixTriplet.end(),
+			divGradMatrixTripletEachThread[i].begin(),
+			divGradMatrixTripletEachThread[i].end());
 		/*for (int j = 0; j < gradOperatorMatrixTripletEachThread[i].size(); j++) {
 			gradOperatorMatrixTriplet[numVal[1]]=gradOperatorMatrixTripletEachThread[i][j];
 			numVal[1]++;

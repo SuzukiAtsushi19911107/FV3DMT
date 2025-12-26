@@ -19,7 +19,7 @@ namespace LocationCalcSettings {
 		bool isCalc = false;
 		std::string locationFile ="";
 		std::string resistivityFile = "";
-		double widthImpedance = 0.001;
+		double widthImpedance = 1.01;
 		int numOfSplit = 1;
 		double ratioResistivity = 0.1;
 	};

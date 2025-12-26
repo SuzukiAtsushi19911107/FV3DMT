@@ -2,6 +2,7 @@
 FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license, visit https://creativecommons.org/publicdomain/zero/1.0/
 */
 #pragma once
+
 #include <iostream>
 #include <vector>
 #include <Eigen/SparseCore>
@@ -18,6 +19,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <kv/autodif.hpp>
 #include <kv/complex.hpp>
 #include "UnstructuredElement.h"
+
 namespace ub = boost::numeric::ublas;
 using namespace std;
 
@@ -2315,7 +2317,7 @@ void UnstructuredElement::UnstructuredElement::CalcOperatorSurface
 					exit(1);
 				}
 				Eigen::Triplet<double> val(calcID, int(it.col() / 3), dHdx[i].coeff(0, it.col()) * surfaceNormalVectors[isurf].coeff(i) * dSvector[isurf]);
-				divGradDsOperator[locDivGrad] = val;
+				divGradDsOperator.push_back(val);
 				locDivGrad++;
 			}
 		}

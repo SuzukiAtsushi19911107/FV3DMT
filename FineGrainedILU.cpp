@@ -309,34 +309,75 @@ void FineGrainedILU::FineGrainedILU::compute(const Eigen::SparseMatrix<double, E
 	std::cout << "Calculation Time for ILU Decomposition:" << end_t - start_t << " Seconds." << endl;
 }
 void FineGrainedILU::FineGrainedILU::solve(Eigen::VectorXcd& b, Eigen::VectorXcd& res) {
-	int nc = res.size() / 3;
-	
-	for (int ic = 0; ic < 3; ic++) {
-		//Ly=b
-		for (int i = 0; i < nc; i++) {
-			complex<double> sum = 0.0;
-			for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(Ls[ic], i); it; ++it) {
-				int j = it.col();
-				if (j >= i) { continue; }
-				sum += res.coeff(ic * nc + j) * Ls[ic].coeff(i, j);
+	//int nc = res.size() / 3;
+	//
+	//for (int ic = 0; ic < 3; ic++) {
+	//	//Ly=b
+	//	for (int i = 0; i < nc; i++) {
+	//		complex<double> sum = 0.0;
+	//		for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(Ls[ic], i); it; ++it) {
+	//			int j = it.col();
+	//			if (j >= i) { continue; }
+	//			sum += res.coeff(ic * nc + j) * Ls[ic].coeff(i, j);
+	//		}
+
+	//		res.coeffRef(ic * nc + i) = (b.coeff(ic * nc + i) - sum) / Ls[ic].coeff(i, i);
+
+	//		
+	//	}
+
+	//	Eigen::SparseMatrix<complex<double>, Eigen::RowMajor> tmp = Us[ic];
+	//	for (int i = nc-1; i >= 0; i--) {
+	//		complex<double> sum = 0.0;
+	//		for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(tmp, i); it; ++it) {
+	//			int j = it.col();
+	//			if (j <= i) { continue; }
+	//			sum += res.coeff(ic * nc + j) * tmp.coeff(i, j);
+	//		}
+	//		res.coeffRef(ic * nc + i) = (res.coeff(ic * nc + i) - sum) / tmp.coeff(i, i);
+
+	//		
+	//	}
+	//}
+
+	const int nc = static_cast<int>(res.size()) / 3;
+
+	for (int ic = 0; ic < 3; ++ic) {
+		// 連続メモリをMap。bは読み取り専用でOK
+		Eigen::Map<const Eigen::VectorXcd> rb(b.data() + ic * nc, nc);
+		Eigen::Map<      Eigen::VectorXcd> rx(res.data() + ic * nc, nc);
+
+		// L は RowMajor（行志向前進代入）
+		const Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>& L = Ls[ic];
+
+		// --- 前進代入: L * y = b（L(ii)=1 前提）
+		for (int i = 0; i < nc; ++i) {
+			std::complex<double> sum = 0.0;
+			for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(L, i); it; ++it) {
+				const int j = it.col();
+				if (j < i) sum += it.value() * rx[j];   // strict-lower だけ使う
 			}
-
-			res.coeffRef(ic * nc + i) = (b.coeff(ic * nc + i) - sum) / Ls[ic].coeff(i, i);
-
-			
+			rx[i] = rb[i] - sum; // L(ii)=1
 		}
 
-		Eigen::SparseMatrix<complex<double>, Eigen::RowMajor> tmp = Us[ic];
-		for (int i = nc-1; i >= 0; i--) {
-			complex<double> sum = 0.0;
-			for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(tmp, i); it; ++it) {
-				int j = it.col();
-				if (j <= i) { continue; }
-				sum += res.coeff(ic * nc + j) * tmp.coeff(i, j);
-			}
-			res.coeffRef(ic * nc + i) = (res.coeff(ic * nc + i) - sum) / tmp.coeff(i, i);
+		// U は ColMajor（列志向後退代入）
+		const Eigen::SparseMatrix<std::complex<double>, Eigen::ColMajor>& U = Us[ic];
 
-			
+		for (int j = nc - 1; j >= 0; --j) {
+			// 対角取得（列j内）
+			std::complex<double> diag = 0.0;
+			for (Eigen::SparseMatrix<std::complex<double>, Eigen::ColMajor>::InnerIterator it(U, j); it; ++it) {
+				if (it.row() == j) { diag = it.value(); break; }
+			}
+			// 安全策（必要に応じてエラー処理）
+			// assert(std::abs(diag) > 0);
+			rx[j] /= diag;  // 正規化
+
+			// 列jの i<j 成分で上三角の寄与を一気に撒く
+			for (Eigen::SparseMatrix<std::complex<double>, Eigen::ColMajor>::InnerIterator it(U, j); it; ++it) {
+				const int i = it.row();
+				if (i < j) rx[i] -= it.value() * rx[j];
+			}
 		}
 	}
 }
