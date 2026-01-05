@@ -25,7 +25,7 @@ efTy=0.1
 needs_SIconv=1
 
 #=================================
-nullNum=-9999
+nullNum=-99999
 def SplitLine(l,toValue=False):
     s=re.split("[\t ,]",l)
     ret=[]
@@ -148,174 +148,8 @@ def CalcImpedance(xprInp,stacks):
         tf=numpy.zeros((1,2), dtype=numpy.complex128)
 
     return [z,tf,varz,vartf]
-
-
-def _read_block_values(lines, start_index):
-    # Read a numeric block that follows an EDI section header.
-    # The header line itself is at lines[start_index].
-    # Returns (values_list, next_index_after_block).
-    vals = []
-    i = start_index + 1
-    while i < len(lines):
-        line = lines[i].strip()
-        # next section header or empty line ends this block
-        if line == "" or line.startswith(">"):
-            break
-        # split by whitespace / comma and keep things that look like numbers
-        for tok in re.split(r"[\s,]+", line):
-            if tok == "":
-                continue
-            # ignore obvious non-numeric tokens
-            if not re.match(r"[+-]?\d", tok):
-                continue
-            try:
-                vals.append(float(tok))
-            except Exception:
-                pass
-        i += 1
-    return vals, i
-
-def ReadImpedanceFromEDI(lines, station):
-    # Read impedance/tipper sections from an EDI file that already contains
-    # Zxx, Zxy, Zyx, Zyy and Tzx, Tzy instead of SPECTRA.
-    # Filled attributes:
-    #   station.freqs, station.Zs, station.Ts, station.varZs, station.varTs
-    freqs = None
-    # impedance components
-    Zxxr = Zxxi = Zxyr = Zxyi = Zyxr = Zyxi = Zyyr = Zyyi = None
-    # impedance variances (optional)
-    Zxxv = Zxyv = Zyxv = Zyyv = None
-    # tipper components (optional)
-    Txr = Txi = Tyr = Tyi = None
-    # tipper variances (optional)
-    Txv = Tyv = None
-
-    i = 0
-    nlines = len(lines)
-    while i < nlines:
-        up = lines[i].strip().upper()
-        if up.startswith(">FREQ"):
-            freqs, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXXR"):
-            Zxxr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXXI"):
-            Zxxi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXYR"):
-            Zxyr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXYI"):
-            Zxyi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYXR"):
-            Zyxr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYXI"):
-            Zyxi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYYR"):
-            Zyyr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYYI"):
-            Zyyi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXX.VAR"):
-            Zxxv, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZXY.VAR"):
-            Zxyv, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYX.VAR"):
-            Zyxv, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">ZYY.VAR"):
-            Zyyv, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TXR"):
-            Txr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TXI"):
-            Txi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TYR"):
-            Tyr, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TYI"):
-            Tyi, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TXVAR"):
-            Txv, i = _read_block_values(lines, i)
-            continue
-        elif up.startswith(">TYVAR"):
-            Tyv, i = _read_block_values(lines, i)
-            continue
-        else:
-            i += 1
-
-    if freqs is None or Zxxr is None or Zxxi is None \
-       or Zxyr is None or Zxyi is None \
-       or Zyxr is None or Zyxi is None \
-       or Zyyr is None or Zyyi is None:
-        # nothing to do – leave station empty
-        return
-
-    n = min(len(freqs), len(Zxxr), len(Zxxi), len(Zxyr), len(Zxyi),
-            len(Zyxr), len(Zyxi), len(Zyyr), len(Zyyi))
-
-    # helper: safe accessor for variance arrays
-    def _get_var(arr, idx):
-        if arr is None or idx >= len(arr):
-            return 0.0
-        return float(arr[idx])
-
-    empty_val = 1e30
-
-    for idx in range(n):
-        f = freqs[idx]
-        # skip obviously empty entries (Geotools uses 1e32 etc.)
-        if abs(Zxxr[idx]) >= empty_val or abs(Zxxi[idx]) >= empty_val:
-            continue
-        if abs(Zxyr[idx]) >= empty_val or abs(Zxyi[idx]) >= empty_val:
-            continue
-        if abs(Zyxr[idx]) >= empty_val or abs(Zyxi[idx]) >= empty_val:
-            continue
-        if abs(Zyyr[idx]) >= empty_val or abs(Zyyi[idx]) >= empty_val:
-            continue
-
-        Z = numpy.zeros((2, 2), dtype=numpy.complex128)
-        Z[0, 0] = Zxxr[idx] + 1j * Zxxi[idx]
-        Z[0, 1] = Zxyr[idx] + 1j * Zxyi[idx]
-        Z[1, 0] = Zyxr[idx] + 1j * Zyxi[idx]
-        Z[1, 1] = Zyyr[idx] + 1j * Zyyi[idx]
-
-        varZ = numpy.zeros((2, 2))
-        varZ[0, 0] = _get_var(Zxxv, idx)
-        varZ[0, 1] = _get_var(Zxyv, idx)
-        varZ[1, 0] = _get_var(Zyxv, idx)
-        varZ[1, 1] = _get_var(Zyyv, idx)
-
-        T = numpy.zeros((1, 2), dtype=numpy.complex128)
-        varT = numpy.zeros((1, 2))
-
-        if Txr is not None and Txi is not None and idx < len(Txr) and idx < len(Txi):
-            if abs(Txr[idx]) < empty_val and abs(Txi[idx]) < empty_val:
-                T[0, 0] = Txr[idx] + 1j * Txi[idx]
-        if Tyr is not None and Tyi is not None and idx < len(Tyr) and idx < len(Tyi):
-            if abs(Tyr[idx]) < empty_val and abs(Tyi[idx]) < empty_val:
-                T[0, 1] = Tyr[idx] + 1j * Tyi[idx]
-
-        varT[0, 0] = _get_var(Txv, idx)
-        varT[0, 1] = _get_var(Tyv, idx)
-
-        station.freqs.append(float(f))
-        station.Zs.append(copy.deepcopy(Z))
-        station.Ts.append(copy.deepcopy(T))
-        station.varZs.append(copy.deepcopy(varZ))
-        station.varTs.append(copy.deepcopy(varT))
-
-
+    
+    
 class Station:
     def __init__(self, name):
         self.name=name
@@ -436,9 +270,7 @@ stations=[]
 fa=open("latLon.csv","w")
 fa.write("ID,lat,lon\n")
 for tmpfile in files:
-    print(tmpfile)
     file=tmpfile[:-1]
-    print(file)
     station=Station(file)
     stations.append(station)
     f=open(file)
@@ -447,8 +279,6 @@ for tmpfile in files:
     allFound=[False,False,False]
     for tmpline in lines:
         line=SplitLine(tmpline)
-        if len(line)==0:
-            continue
         if line[0][:3].upper()=="LAT":
             vals=tmpline.split("=")[1].split(":")
             val=float(vals[0])+float(vals[1])/60+float(vals[2])/3600
@@ -470,54 +300,42 @@ for tmpfile in files:
     fn=fn.split(".")[0][:6]
     fa.write(fn+","+str(station.lat)+","+str(station.long)+"\n")
     #data read
-    print("File:", file)
-    # Decide whether this EDI has SPECTRA (cross-power) or pre-computed impedance
-    has_spectra = False
-    for tmpline in lines:
-        parts = SplitLine(tmpline)
-        if len(parts) > 0 and parts[0].upper() == ">SPECTRA":
-            has_spectra = True
-            break
+    i=0
+    comp=1j
+    print("File:",file)
+    while i<len(lines):
+        line=SplitLine(lines[i])
 
-    if has_spectra:
-        i = 0
-        comp = 1j
-        while i < len(lines):
-            line = SplitLine(lines[i])
-            if len(line) == 0:
-                i += 1
-                continue
+        if line[0]==">SPECTRA":
+            station.freqs.append(float(line[1].split("=")[1]))
+            for s in line:
+                if s[:4].upper()=="AVGT":
+                    stacks=float(s.split("=")[1])
 
-            if line[0].upper() == ">SPECTRA":
-                station.freqs.append(float(line[1].split("=")[1]))
-                for s in line:
-                    if s[:4].upper() == "AVGT":
-                        stacks = float(s.split("=")[1])
+            
+            line=SplitLine(lines[i+1])
 
-                array = numpy.zeros((7, 7))
-                xpr = numpy.zeros((7, 7), dtype=numpy.complex128)
-                for j in range(7):
-                    vals = SplitLine(lines[i+1+j], True)
-                    for k in range(7):
-                        array[j, k] = vals[k]
-                for row in range(7):
-                    xpr[row, row] = array[row, row]
-                    for col in range(row+1, 7):
-                        xpr[row, col] = array[col, row]-comp*array[row, col]
-                        xpr[col, row] = array[col, row]+comp*array[row, col]
+            array=numpy.zeros((7,7))
+            xpr=numpy.zeros((7,7), dtype=numpy.complex128)
+            for j in range(7):
+                vals=SplitLine(lines[i+1+j],True)
+                for k in range(7):
+                    array[j,k]=vals[k]
+            for row in range(7):
+                        xpr[row,row]=array[row,row]
+                        for col in range(row+1,7):
+                            xpr[row,col]=array[col,row]-comp*array[row,col];
+                            xpr[col,row]=array[col,row]+comp*array[row,col];
 
-                [Z, T, varZ, varT] = CalcImpedance(xpr, stacks)
+            [Z,T,varZ,varT]=CalcImpedance(xpr,stacks)
 
-                station.Zs.append(copy.deepcopy(Z))
-                station.Ts.append(copy.deepcopy(T))
-                station.varZs.append(copy.deepcopy(varZ))
-                station.varTs.append(copy.deepcopy(varT))
-                i += 7
-
-            i += 1
-    else:
-        # Read impedance/tipper directly from the EDI file
-        ReadImpedanceFromEDI(lines, station)
+            station.Zs.append(copy.deepcopy(Z))
+            station.Ts.append(copy.deepcopy(T))
+            station.varZs.append(copy.deepcopy(varZ))
+            station.varTs.append(copy.deepcopy(varT))
+            i+=7
+            
+        i+=1   
 fa.close()
    
 #=========以降は解析用に書き込み================================
