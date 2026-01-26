@@ -52,6 +52,9 @@ namespace Element {
 		int ny = -1;
 		int nz = -1;
 
+		bool interpolateLogScale = true;
+		vector<int> notInterpolateLogScaleSurfaces;
+
 		double rhoXY = 0;
 		double rhoYX = 0;
 		double phiXY = 0;

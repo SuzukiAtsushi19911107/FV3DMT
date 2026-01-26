@@ -1018,6 +1018,15 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					invSettings->safetyFactor = stod(line[1]);
 					line = readNext(f);
 				}
+				else if (strcasecmp(line[0].c_str(), "useLogScaleInterpolation") == 0) {
+					if (!strcasecmp("true", line[1].c_str())) {
+						invSettings->useLogScaleInterpolation = true;
+					}
+					else {
+						invSettings->useLogScaleInterpolation = false;
+					}
+					line = readNext(f);
+				}
 				else if (strcasecmp(line[0].c_str(), "CalcJustDataMisfit") == 0) {
 					if (!strcasecmp("true", line[1].c_str())) {
 						calcJustDataMisfit = true;

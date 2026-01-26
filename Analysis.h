@@ -176,7 +176,7 @@ namespace Analysis {
 
 		bool isAlreadyMadeMatrix = false;
 
-		
+		bool useLogScaleInElement = false;
 
 		bool inheritPreviousObjVal = false;
 		int numOfSameModelWeightCalc = 1;
@@ -260,6 +260,7 @@ namespace Analysis {
 		//Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor> dZdH;
 		//Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor> dZdRho;
 		int Hpolarization = 0;
+		void SetLogScale();
 		void ClearHAndE();
 		void ClearZ();
 		void RunAnalysis();

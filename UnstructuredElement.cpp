@@ -411,14 +411,69 @@ void UnstructuredElement::UnstructuredElement::CalcSurfaceResistivity(unordered_
 				diffResistivitySurfaceCoeff[isurf]->data().squeeze();
 			}
 			(*resistivitySurface)[isurf] = 0.0;
+
 			for (int j = 0; j < resistivitySurfaceCoeff[isurf]->outerSize(); ++j) {
 				for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(*resistivitySurfaceCoeff[isurf], j); it; ++it)
 				{
 					int iRow = it.row();
 					int iCol = it.col();
-					Element*  element = (*calcElementsVector)[iCol];
-					(*resistivitySurface)[isurf] += resistivitySurfaceCoeff[isurf]->coeff(0, iCol).real()*element->resistivity;
+					Element* element = (*calcElementsVector)[iCol];
+					(*resistivitySurface)[isurf] += resistivitySurfaceCoeff[isurf]->coeff(0, iCol).real() * element->resistivity;
 				}
+			}
+
+			bool flg = true;
+			for (int ii = 0; ii < notInterpolateLogScaleSurfaces.size(); ii++) {
+				if (notInterpolateLogScaleSurfaces[ii] == isurf) {
+					flg = false;
+				}
+			}
+
+			if (interpolateLogScale == true && flg==true) 				{ //This is not efficient because the calculations above include the useless infomation for this case, but it is clear, so I implement this way. 
+				std::vector<Eigen::Vector3d> Xc;
+				std::vector<double> uc;
+				std::vector<int> cols;
+				for (int j = 0; j < resistivitySurfaceCoeff[isurf]->outerSize(); ++j) {
+					for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(*resistivitySurfaceCoeff[isurf], j); it; ++it)
+					{
+						int iRow = it.row();
+						int iCol = it.col();
+						Element* element = (*calcElementsVector)[iCol];
+						Xc.push_back(element->centerCoord);
+						uc.push_back(std::log(element->resistivity));
+						cols.push_back(iCol);
+					}
+				}
+
+				double resisSurface = 0.0;
+				std::vector<double> alpha_out;
+				
+				bool suc = Functions::interp_face_quadratic_wls_with_alpha(
+					surfaceCenters[isurf],
+					surfaceNormalVectors[isurf],
+					Xc,
+					uc,                     // 近傍セル中心値
+					resisSurface,                                 // 面中心の補間値
+					alpha_out,                    // size N: uf = sum alpha[p]*uc[p]
+					2.0,
+					1e-12
+				);
+				if (suc) {
+					
+					(*resistivitySurface)[isurf] = std::exp(resisSurface);
+					
+					double s = 0.0;
+					for (int ii = 0; ii < cols.size(); ii++) {
+						resistivitySurfaceCoeff[isurf]->coeffRef(0, cols[ii]) = alpha_out[ii];
+						s += alpha_out[ii];
+					}
+		
+				}
+				else {
+					interpolateLogScale = false;
+				}
+
+
 			}
 		}
 		
@@ -1317,7 +1372,12 @@ ub::matrix<kv::autodif<kv::complex<double>>> UnstructuredElement::UnstructuredEl
 			W.coeffRef(2 * i, 2 * i) = 1;// dSvector[i];
 			W.coeffRef(2 * i + 1, 2 * i + 1) = 1;// dSvector[i];
 			double dS = dSvector[i];
-
+			bool flg = true;
+			for (int ii = 0; ii < notInterpolateLogScaleSurfaces.size(); ii++) {
+				if (notInterpolateLogScaleSurfaces[ii] == i) {
+					flg = false;
+				}
+			}
 			kv::autodif<kv::complex<double>>rho;
 			rho = 0.0;
 			for (int j = 0; j < resistivitySurfaceCoeff[i]->outerSize(); ++j) {
@@ -1327,10 +1387,18 @@ ub::matrix<kv::autodif<kv::complex<double>>> UnstructuredElement::UnstructuredEl
 					int iRow = it.row();
 					for (int k = 0; k < nonZeroRowIndices.size(); k++) {
 						if (nonZeroRowIndices[k] == iCol) {
-							rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real() * (*rhoVec)(k);
+							if (!interpolateLogScale || !flg) {
+								rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real() * (*rhoVec)(k);
+							}
+							else {
+								rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real() * log((*rhoVec)(k));
+							}
 						}
 					}
 				}
+			}
+			if (interpolateLogScale && flg) {
+				rho = exp(rho);
 			}
 
 			ub::vector<kv::autodif<kv::complex<double>>> tmp(3);

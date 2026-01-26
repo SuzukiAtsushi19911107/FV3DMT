@@ -14,13 +14,146 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <bitset>
 #include <sstream>
 #include <iomanip>
-
+#include <Eigen/Dense>
+#include <vector>
+#include <cmath>
 namespace Element {
 	class Element;
 }
 //必要な関数をまとめておいておく
 using namespace std;
 namespace Functions {
+
+
+	// より安全な接線基底
+// 安定な接線基底を作る（n は単位ベクトル想定）
+	static inline void make_tangent_basis(const Eigen::Vector3d& n_unit,
+		Eigen::Vector3d& t1,
+		Eigen::Vector3d& t2)
+	{
+		// n に最も平行になりにくい軸を選ぶ
+		Eigen::Vector3d a;
+		const Eigen::Vector3d an = n_unit.cwiseAbs();
+		if (an.x() <= an.y() && an.x() <= an.z())      a = Eigen::Vector3d::UnitX();
+		else if (an.y() <= an.x() && an.y() <= an.z()) a = Eigen::Vector3d::UnitY();
+		else                                           a = Eigen::Vector3d::UnitZ();
+
+		t1 = (a - a.dot(n_unit) * n_unit).normalized();
+		t2 = n_unit.cross(t1).normalized();
+	}
+
+	// 互換インタフェース：面中心値を返しつつ、セル寄与係数 alpha_out も返す
+	// 注意：内部は「7基底（一次＋交差）」で解く
+	// 基底: [1, xi, eta, zeta, xi*eta, xi*zeta, eta*zeta]
+	inline bool interp_face_quadratic_wls_with_alpha(
+		const Eigen::Vector3d& xf,
+		const Eigen::Vector3d& n_in,
+		const std::vector<Eigen::Vector3d>& Xc, // 近傍セル中心
+		const std::vector<double>& uc,          // 近傍セル中心値
+		double& value_out,                      // 面中心の補間値
+		std::vector<double>& alpha_out,         // uf = sum alpha[p] * uc[p]
+		double q = 2.0,
+		double eps_scale = 1e-12
+	) {
+		constexpr int K = 7; // 係数数（7基底）
+		const int N = static_cast<int>(Xc.size());
+
+		if (N < K || static_cast<int>(uc.size()) != N) {
+			value_out = std::numeric_limits<double>::quiet_NaN();
+			alpha_out.clear();
+			return false;
+		}
+
+		// n を正規化（呼び出し側が unit を保証していても安全のため）
+		const double nn = n_in.norm();
+		if (!(nn > 0.0)) {
+			value_out = std::numeric_limits<double>::quiet_NaN();
+			alpha_out.clear();
+			return false;
+		}
+		const Eigen::Vector3d n_unit = n_in / nn;
+
+		Eigen::Vector3d t1, t2;
+		make_tangent_basis(n_unit, t1, t2);
+
+		// eps のスケール：近傍距離の代表値を用いる
+		double L = 0.0;
+		for (int p = 0; p < N; ++p) L += (Xc[p] - xf).norm();
+		L /= std::max(1, N);
+		const double eps = eps_scale * std::max(L, 1e-30);
+		const double eps2 = eps * eps;
+
+		Eigen::MatrixXd A(N, K);
+		Eigen::VectorXd b(N);
+		Eigen::VectorXd w(N);
+
+		for (int p = 0; p < N; ++p) {
+			const Eigen::Vector3d r = Xc[p] - xf;
+			const double xi = r.dot(t1);
+			const double eta = r.dot(t2);
+			const double zeta = r.dot(n_unit);
+
+			// 7基底（一次＋交差）
+			A(p, 0) = 1.0;
+			A(p, 1) = xi;
+			A(p, 2) = eta;
+			A(p, 3) = zeta;
+			A(p, 4) = xi * eta;
+			A(p, 5) = xi * zeta;
+			A(p, 6) = eta * zeta;
+
+			b(p) = uc[p];
+
+			const double d2 = r.squaredNorm();
+			w(p) = 1.0 / std::pow(d2 + eps2, 0.5 * q); // q=0 なら w=1
+		}
+
+		// W = diag(w^2)
+		const Eigen::VectorXd ws = w.array().square();
+
+		// 正規方程式
+		Eigen::MatrixXd AtWA = A.transpose() * ws.asDiagonal() * A;
+		Eigen::VectorXd AtWb = A.transpose() * ws.asDiagonal() * b;
+
+		// 解く
+		Eigen::LDLT<Eigen::MatrixXd> ldlt(AtWA);
+		if (ldlt.info() != Eigen::Success) {
+			value_out = std::numeric_limits<double>::quiet_NaN();
+			alpha_out.clear();
+			return false;
+		}
+
+		const Eigen::VectorXd a = ldlt.solve(AtWb);
+		if (ldlt.info() != Eigen::Success) {
+			value_out = std::numeric_limits<double>::quiet_NaN();
+			alpha_out.clear();
+			return false;
+		}
+
+		// 面中心では xi=eta=zeta=0 なので a0 が補間値
+		value_out = a(0);
+
+		// alpha を取り出す：
+		// alpha^T = e0^T (AtWA)^{-1} A^T W
+		// x = (AtWA)^{-1} e0 を解いて alpha = W A x
+		Eigen::VectorXd e0 = Eigen::VectorXd::Zero(K);
+		e0(0) = 1.0;
+
+		const Eigen::VectorXd x = ldlt.solve(e0);
+		if (ldlt.info() != Eigen::Success) {
+			value_out = std::numeric_limits<double>::quiet_NaN();
+			alpha_out.clear();
+			return false;
+		}
+
+		const Eigen::VectorXd Ax = A * x;                     // size N
+		const Eigen::VectorXd alpha = ws.array() * Ax.array(); // size N
+
+		alpha_out.resize(N);
+		for (int p = 0; p < N; ++p) alpha_out[p] = alpha(p);
+
+		return true;
+	}
 	inline Eigen::Matrix3d inv3(Eigen::Matrix3d A) {
 
 		Eigen::Matrix3d inv(3, 3);
