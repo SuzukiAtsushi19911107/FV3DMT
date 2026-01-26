@@ -97,6 +97,8 @@ namespace InvSettings {
 		int averageIterations = 5;
 		int numTrunc = 5;
 
+		bool useLogScaleInterpolation = false;
+
 		std::string initialGuessFile = "None";
 		std::string InitialGuessOutputFile = "None";
 

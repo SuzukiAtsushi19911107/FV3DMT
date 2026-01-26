@@ -18,6 +18,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <boost/numeric/ublas/io.hpp>
 #include <kv/autodif.hpp>
 #include <kv/complex.hpp>
+
 #include "Node.h"
 
 namespace ub = boost::numeric::ublas;
@@ -482,6 +483,58 @@ void Element::Element::CalcSurfaceResistivity(unordered_map<string, Element*>* e
 					Element*  element = (*calcElementsVector)[iCol];
 					(*resistivitySurface)[i] += resistivitySurfaceCoeff[i]->coeff(0, iCol).real()*element->resistivity;
 				}
+			}
+			bool flg = true;
+			for (int ii = 0; ii < notInterpolateLogScaleSurfaces.size(); ii++) {
+				if (notInterpolateLogScaleSurfaces[ii] == i) {
+					flg = false;
+				}
+			}
+			if (interpolateLogScale == true && flg==true) { //This is not efficient because the calculations above include the useless infomation for this case, but it is clear, so I implement this way. 
+				std::vector<Eigen::Vector3d> Xc;
+				std::vector<double> uc;
+				std::vector<int> cols;
+				for (int j = 0; j < resistivitySurfaceCoeff[i]->outerSize(); ++j) {
+					for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(*resistivitySurfaceCoeff[i], j); it; ++it)
+					{
+						int iRow = it.row();
+						int iCol = it.col();
+						Element* element = (*calcElementsVector)[iCol];
+						Xc.push_back(element->centerCoord);
+						uc.push_back(std::log(element->resistivity));
+						cols.push_back(iCol);
+					}
+				}
+
+				double resisSurface = 0.0;
+				std::vector<double> alpha_out;
+
+				bool suc = Functions::interp_face_quadratic_wls_with_alpha(
+					surfaceCenters[i],
+					surfaceNormalVectors[i],
+					Xc,
+					uc,                     // 近傍セル中心値
+					resisSurface,                                 // 面中心の補間値
+					alpha_out,                    // size N: uf = sum alpha[p]*uc[p]
+					2.0,
+					1e-12
+				);
+				if (suc) {
+
+					(*resistivitySurface)[i] = std::exp(resisSurface);
+
+					double s = 0.0;
+					for (int ii = 0; ii < cols.size(); ii++) {
+						resistivitySurfaceCoeff[i]->coeffRef(0, cols[ii]) = alpha_out[ii];
+						s += alpha_out[ii];
+					}
+
+				}
+				else {
+					interpolateLogScale = false;
+				}
+
+
 			}
 		}
 		
@@ -2490,6 +2543,12 @@ ub::matrix<kv::autodif<kv::complex<double>>> Element::Element::CalcDEDRho(ub::ve
 		else dS = dx * dy;
 		kv::autodif<kv::complex<double>>rho;
 		rho = 0.0;
+		bool flg = true;
+		for (int ii = 0; ii < notInterpolateLogScaleSurfaces.size(); ii++) {
+			if (notInterpolateLogScaleSurfaces[ii] == i) {
+				flg = false;
+			}
+		}
 		for (int j = 0; j < resistivitySurfaceCoeff[i]->outerSize(); ++j) {
 			for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(*resistivitySurfaceCoeff[i], j); it; ++it)
 			{
@@ -2497,12 +2556,19 @@ ub::matrix<kv::autodif<kv::complex<double>>> Element::Element::CalcDEDRho(ub::ve
 				int iRow = it.row();
 				for (int k = 0; k < nonZeroRowIndices.size(); k++) {
 					if (nonZeroRowIndices[k] == iCol) {
-						rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real()*(*rhoVec)(k);
+						if (!interpolateLogScale || !flg) {
+							rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real() * (*rhoVec)(k);
+						}
+						else {
+							rho += resistivitySurfaceCoeff[i]->coeff(0, iCol).real() * log((*rhoVec)(k));
+						}
 					}
 				}
 			}
 		}
-
+		if (interpolateLogScale && flg) {
+			rho = exp(rho);
+		}
 		//}
 		for (int itr = 0; itr < 2; itr++) {
 			ub::vector<kv::autodif<kv::complex<double>>> tmp(3);
@@ -2603,11 +2669,25 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 		ub::vector<kv::autodif<complex<double>>> dSumNCrossRhoRotHdSRhoSparse{ 3 };
 
 		for (int i = 0; i < 6; i++) {
+			bool flg = true;
+			for (int ii = 0; ii < notInterpolateLogScaleSurfaces.size(); ii++) {
+				if (notInterpolateLogScaleSurfaces[ii] == i) {
+					flg = false;
+				}
+			}
 
 			kv::autodif<complex<double>> rho;
 			for (int j = 0; j < nonZeroRowIndices.size(); j++) {
 				//rho += resistivitySurfaceCoeff[i]->coeff(0,nonZeroRowIndices[j]).real()*rhoVecSparse(j); 
-				rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real()*rhoVecSparse(j);
+				if (interpolateLogScale == false || flg==false) {
+					rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real() * rhoVecSparse(j);
+				}
+				else {
+					rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real() * log (rhoVecSparse(j));
+				}
+			}
+			if (interpolateLogScale && flg==true) {
+				rho = exp(rho);
 			}
 			//rho = rho / rhoVecSparse(maxResisIndex) / dx / dy / dz; //rhoVecSparse(indexMyself)/dx/dy/dz is for Standardization
 															  //Connected With variable "unit" in MakeMatrix() in Analysis

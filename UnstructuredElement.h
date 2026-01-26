@@ -32,7 +32,11 @@ namespace UnstructuredElement {
 	public:
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+			
+
 		UnstructuredElement();
+		
+
 		void CalcSurfaceResistivity(unordered_map<string, Element*>* elements, vector<Element*>* calcElementsVector, int numOfCalcElements);
 		void CalcE(Eigen::SparseMatrix<std::complex< double >, Eigen::ColMajor>* Hresult, unordered_map<string, Element*>* elements, int numOfCalcElements, int itr);
 		void CalcE(Eigen::VectorXcd* Hresult, unordered_map<string, Element*>* elements, int numOfCalcElements, int itr);

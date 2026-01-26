@@ -4,6 +4,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 //#define OPTIM_USE_OPENMP Comment out because openmp is used in each loop in the function Optimize()
 #pragma once
+//#include "mimalloc_config.h"
 #include "optim.hpp"
 #include <vector>
 #include <Eigen/Sparse>
@@ -35,6 +36,8 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <filesystem>
 #include <iostream>
 #include "Functions.h"
+#include "Fista_L1.hpp"
+
 namespace fs = std::filesystem;
 //#define MI_MALLOC_OVERRIDE
 //#include <mimalloc.h>
@@ -76,6 +79,8 @@ Analysis::Analysis::Analysis(ReadData::ReadData* readData) {
 
 	useL1Norm = invSettings->useL1Norm;
 	rateL1Norm = invSettings->rateL1Norm;
+
+	useLogScaleInElement = invSettings->useLogScaleInterpolation;
 
 	//params for FFT Sensitivity Analysis
 	FFTSensitivityMode=readData->isFFTSensitivityMode;
@@ -397,6 +402,7 @@ void Analysis::Analysis::Initialize() {
 
 	SetCalcDivGradCells();
 
+	SetLogScale();
 	std::cout << "Calc Surface Resistivity.." << std::endl;;
 	CalcSurfaceResistivityElements();
 	std::cout << "End Calc Surface Resistivity.." << std::endl;
@@ -4157,7 +4163,34 @@ void Analysis::Analysis::RunOptimize() {
 
 			}
 			else {
-				success = optim::cg(paramVec, optFunc, opt_data, settings);
+				void* dummy = nullptr;
+
+				auto value_grad = [&](const Eigen::VectorXd& m, Eigen::VectorXd& g) -> double {
+					return Optimize(m, &g, dummy);
+					};
+
+				auto value_only = [&](const Eigen::VectorXd& m) -> double {
+					return Optimize(m, nullptr, dummy);
+					};
+
+				Eigen::VectorXd m_init= paramVec; // initial model
+				Eigen::VectorXd m0= paramVec;     // refference model
+				double beta = weightRoughening; //This is temporal.
+
+				fista::Options opt;
+				opt.max_iters = settings.iter_max;
+				opt.max_backtracks = 10;
+				opt.L0 = 1.0;
+				opt.use_monotone = true;
+				opt.use_fista = true;
+				opt.restart = true;
+
+				auto res = fista::solve_l1_shifted_fista_vg(
+					m_init, m0, beta,
+					value_grad,
+					value_only,
+					opt
+				);
 			}
 
 
@@ -4262,7 +4295,36 @@ void Analysis::Analysis::RunOptimize() {
 
 			}
 			else {
-				success = optim::cg(paramVec, optFunc, opt_data, settings);
+				cout << "FISTA For L1 Norm Start!!!!!!" << endl;
+
+				void* dummy = nullptr;
+
+				auto value_grad = [&](const Eigen::VectorXd& m, Eigen::VectorXd& g) -> double {
+					return Optimize(m, &g, dummy);
+					};
+
+				auto value_only = [&](const Eigen::VectorXd& m) -> double {
+					return Optimize(m, nullptr, dummy);
+					};
+
+				Eigen::VectorXd m_init = paramVec; // initial model
+				Eigen::VectorXd m0 = paramVec;     // refference model
+				double beta = weightRoughening; //This is temporal.
+
+				fista::Options opt;
+				opt.max_iters = settings.iter_max;
+				opt.max_backtracks = 10;
+				opt.L0 = 1.0;
+				opt.use_monotone = true;
+				opt.use_fista = true;
+				opt.restart = true;
+
+				auto res = fista::solve_l1_shifted_fista_vg(
+					m_init, m0, beta,
+					value_grad,
+					value_only,
+					opt
+				);
 			}
 
 			isBelowRMS[i] = isBelowRMSThreshold;
@@ -6847,5 +6909,28 @@ void Analysis::Analysis::ReadInitialGuess(string filename, Eigen::VectorXcd& res
 	catch (...) {
 		std::cout << "Cannot Read Initial Guess From File!!!!!"  << std::endl;
 		return;
+	}
+}
+
+void Analysis::Analysis::SetLogScale() {
+
+
+	for (int i = 0; i < numOfCalcElements; i++) {
+		Element::Element* element = calcElementsVector[i];
+		element->interpolateLogScale = false;
+		if (useLogScaleInElement && element->property->type != Property::Property::AIR) {
+			element->interpolateLogScale = true;
+		}
+		Eigen::Vector3i pos;
+		//for (int i = 0; i < 6; i++) {
+		pos.setZero();
+		pos.coeffRef(2) = -1;
+		int ipos = (pos.coeff(0) + 1) + 3 * (pos.coeff(1) + 1) + 9 * (pos.coeff(2) + 1);
+		if (!(element->alreadyFoundNeighborID[ipos].find("BOUNDARY") == string::npos && element->isParent == false && elements[element->alreadyFoundNeighborID[ipos]]->isAirGroundBoundaryCell == true && element->property->type != Property::Property::AIR)) {
+			continue;
+		}
+		element->notInterpolateLogScaleSurfaces.push_back(4); //In cells which share the surface with isAirGroundBoundaryCell, the interpolation on the surface should not be LogScale. 
+
+
 	}
 }
