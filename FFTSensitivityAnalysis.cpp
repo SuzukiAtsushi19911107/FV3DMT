@@ -248,9 +248,9 @@ namespace {
                     double ww = w[id]; if (ww <= 0) continue;
 
                     // 振幅±epsR, 位相±epst
-                    double a_rand = 1.0 + epsR * U(rng);
+                    double a_rand = 1.0 + ww*epsR * U(rng);
                     double th_rand = epst * U(rng);
-                    std::complex<double> alpha = std::polar(a_rand * ww, th_rand);
+                    std::complex<double> alpha = std::polar(a_rand , th_rand);
 
                     auto Fk_old = Fh[id];
                     //cout <<id<<" "<< a_rand << " " << alpha << " " << Fk_old << " " << ww<<endl;
