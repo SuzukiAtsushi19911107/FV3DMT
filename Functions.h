@@ -258,6 +258,7 @@ namespace Functions {
 		//calc result
 		for (int i = 0; i < 3; i++) {
 			T2 a;
+			a=0.0;
 			for (int j = 0; j < numOfEqs; j++) {
 				a += inv.coeff(i, j) * rhs(j);
 			}
