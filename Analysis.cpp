@@ -1462,7 +1462,7 @@ void Analysis::Analysis::AssociationPropertiesToElements() {
 	for (auto itr = elementsVector.begin(); itr != elementsVector.end(); itr++) {
 		Element::Element* element = *itr;
 		bool findProp = false;
-		if (!properties.contains(element->propID)) {
+		if (properties.find(element->propID) == properties.end()){
 			std::cout << "No Property ID which set to Element in Data" << std::endl;
 			exit(1);
 		}
