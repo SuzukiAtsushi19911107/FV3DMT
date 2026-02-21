@@ -4,7 +4,6 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 //#define OPTIM_USE_OPENMP Comment out because openmp is used in each loop in the function Optimize()
 #pragma once
-//#include "mimalloc_config.h"
 #include "optim.hpp"
 #include <vector>
 #include <Eigen/Sparse>

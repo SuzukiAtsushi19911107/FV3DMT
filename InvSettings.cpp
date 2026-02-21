@@ -13,7 +13,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <fstream>
 #include "optim.hpp"
 #include <ostream>
-#define strcasecmp _stricmp
+
 InvSettings::InvSettings::InvSettings(int numOfLambda) {
 	objFuncChangeThresholdVector.resize(numOfLambda);
 	thresholdRelativeResistivityChangeVector.resize(numOfLambda);
