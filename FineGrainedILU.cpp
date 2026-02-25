@@ -23,6 +23,7 @@ Vol. 37, No. 2, pp. C169–C193
 */
 using namespace std;
 void FineGrainedILU::FineGrainedILU::compute(const Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>& mat) {
+	reset_if_size_mismatch(mat.rows());
 	time_t start_t = time(NULL);
 	int n = mat.rows();
 	int nc = n / 3;
@@ -166,6 +167,7 @@ void FineGrainedILU::FineGrainedILU::compute(const Eigen::SparseMatrix<complex<d
 	std::cout << "Calculation Time for ILU Decomposition:" << end_t - start_t << " Seconds." << endl;
 }
 void FineGrainedILU::FineGrainedILU::compute(const Eigen::SparseMatrix<double, Eigen::RowMajor>& matR, const Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>& matI) {
+	reset_if_size_mismatch(matR.rows());
 	time_t start_t = time(NULL);
 	int n = matR.rows();
 	int nc = n / 3;
@@ -380,5 +382,67 @@ void FineGrainedILU::FineGrainedILU::solve(Eigen::VectorXcd& b, Eigen::VectorXcd
 			}
 		}
 	}
+}
+void FineGrainedILU::FineGrainedILU::release_memory(bool shrink_vectors)
+{
+    // Release Eigen sparse matrices completely (capacity included).
+    for (int i = 0; i < 3; ++i) {
+        {
+            // Release RowMajor complex sparse matrix
+            Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor> empty;
+            Ls[i].swap(empty);
+        }
+        {
+            // Release ColMajor complex sparse matrix
+            Eigen::SparseMatrix<std::complex<double>, Eigen::ColMajor> empty;
+            Us[i].swap(empty);
+        }
+        {
+            // Release sparsePatterns (currently stored as complex<double> RowMajor in your header)
+            Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor> empty;
+            sparsePatterns[i].swap(empty);
+        }
+    }
+
+    // Optionally shrink the std::vector containers themselves (minor, but deterministic).
+    if (shrink_vectors) {
+        std::vector<Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>>(Ls.begin(), Ls.end()).swap(Ls);
+        std::vector<Eigen::SparseMatrix<std::complex<double>, Eigen::ColMajor>>(Us.begin(), Us.end()).swap(Us);
+        std::vector<Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>>(sparsePatterns.begin(), sparsePatterns.end()).swap(sparsePatterns);
+    }
+
+    // Keep the vectors size=3 (constructor expects that).
+    if ((int)Ls.size() != 3) Ls.resize(3);
+    if ((int)Us.size() != 3) Us.resize(3);
+    if ((int)sparsePatterns.size() != 3) sparsePatterns.resize(3);
+
+    // Reset state.
+    isInitialized = false;
+}
+
+void FineGrainedILU::FineGrainedILU::reset_if_size_mismatch(int n_rows)
+{
+    // Defensive: n_rows must be a multiple of 3 for your block split.
+    if (n_rows <= 0 || (n_rows % 3) != 0) {
+        // If invalid, just reset to a clean state.
+        release_memory(false);
+        return;
+    }
+
+    const int nc = n_rows / 3;
+
+    if (!isInitialized) return;
+
+    // If internal matrices do not match the current size, reinitialize.
+    // Note: only checking Ls[0]/Us[0] is enough because all are set together.
+    const bool size_ok =
+        (Ls.size() == 3 && Us.size() == 3 && sparsePatterns.size() == 3) &&
+        (Ls[0].rows() == nc && Ls[0].cols() == nc) &&
+        (Us[0].rows() == nc && Us[0].cols() == nc) &&
+        (sparsePatterns[0].rows() == nc && sparsePatterns[0].cols() == nc);
+
+    if (!size_ok) {
+        release_memory(false);
+    }
 }
 
