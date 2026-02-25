@@ -29,6 +29,13 @@ namespace FineGrainedILU {
 			Us.resize(3);
 			sparsePatterns.resize(3);
 		}
+		// Release internal memory buffers.
+		// After calling this, compute() will rebuild patterns/L/U on demand.
+		void release_memory(bool shrink_vectors = true);
+
+		// Ensure internal buffers match the given matrix size.
+		// If size changed, it releases memory and resets initialization state.
+		void reset_if_size_mismatch(int n_rows);
 		bool isInitialized = false;
 		int ratioToOriginalMat = 1;
 		int sweep = 10;

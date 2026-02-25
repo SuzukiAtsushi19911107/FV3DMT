@@ -190,7 +190,7 @@ namespace Analysis {
 		DivergenceCorrection::DivergenceCorrection* divergenceCorrection;
 		vector<vector<vector<Element::Element*>>> basedElementsSortByNxNyNz;
 
-		vector<BiCGSafe::BiCGSafe*> iterativeSolverVector;
+		//vector<BiCGSafe::BiCGSafe*> iterativeSolverVector;
 
 		int numOfObsImpedanceElements = 0;
 
