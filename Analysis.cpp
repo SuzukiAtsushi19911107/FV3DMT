@@ -341,13 +341,9 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 		}
 		ClearHAndE();
 	}
-	cout<<"DEBUG PRE OUT"<<endl;
 	output->ImpedanceOutputSurface(boundary->omega, &elements);
-	cout<<"DEBUG POS OUT1"<<endl;
 	output->TipperOutputSurface(boundary->omega, &elements);
-	cout<<"DEBUG POS OUT2"<<endl;
 	Eigen::setNbThreads(1);
-	cout<<"DEBUG END SOLVE CALC_FOWARD"<<endl;
 }
 void Analysis::Analysis::SetH(int iOmega) {
 	for (int i = 0; i < numOfCalcElements; i++) {
@@ -3478,7 +3474,7 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 	obj_val = CalcDataMisfit();
 	RMS = std::pow(obj_val / numOfObsData, 0.5);
 	
-	cout<<"DEBUG END CalcDataMisfit"<<endl;
+
 	std::cout << "DataMisfit:" << obj_val << std::endl;
 
 
@@ -3524,9 +3520,7 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 		debugElemID.push_back(obsPointElements[20]->invertedRhoElementsID);*/
 		if (isChangeResis == true || isFirstLoop==true) {
 			CalcDDataMisfitDRho();
-			cout<<"DEBUG END CalcDDataMisfitDRho"<<endl;
 			CalcDJDRho();
-			cout<<"DEBUG END CalcDJDRho"<<endl;
 			//CalcJacobian();
 		}
 		if (optMethod == "GD") {
@@ -3579,7 +3573,6 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 				output->OutputDistortionMatrixForRestart(&obsImpedanceElements, filename);
 			}
 		}
-		cout<<"DEBUG END OUTPUTS"<<endl;
 	}
 
 
