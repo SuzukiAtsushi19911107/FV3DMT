@@ -22,7 +22,6 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include <boost/numeric/ublas/matrix_sparse.hpp>
 #include "LocationData.h"
 #include "Node.h"
-#include <array>
 namespace ub = boost::numeric::ublas;
 using namespace std;
 
@@ -31,12 +30,7 @@ namespace Element {
 	{
 	public:
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-		struct RhoSurfEntry {
-			int globalElemIdx;   // iCol（calcElementsVector上のindex）
-			int invRhoID;        // invertedRhoElementsID
-			double coeff;        // resistivitySurfaceCoeffの実部（c_j）
-		};
-		std::string ID = "-1";
+			std::string ID = "-1";
 		std::vector<Node::Node*> nodes; //order is (i,j,k),(i+1,j,k),(i+1,j+1,k),(i,j+1,k),(i,j,k+1),(i+1,j,k+1),(i+1,j+1,k+1),(i,j+1,k+1)
 		bool isAirGroundBoundaryCell;
 		bool isSecondCellOfAirGroundBoundary = false;
@@ -142,11 +136,6 @@ namespace Element {
 		bool calcGradDivOperationElement = false;
 
 		double factorForDivCorr;
-		
-		
-		std::array<std::vector<RhoSurfEntry>, 6> rhoSurfEntries;
-		std::array<bool, 6> rhoSurfUseLog;   // surfaceごとにlog補間かどうか
-		bool rhoSurfCacheBuilt = false;
 
 		void SearchChildrenElements(unordered_map<string, Element*>* elements, map<string, Element*>* elementsMap);
 		void SearchRelatedCalcElements(unordered_map<string, Element*>* elements);
@@ -199,15 +188,9 @@ namespace Element {
 		void CalcDTDH(int numOfCalcElements, int iOmega);
 
 
-		void CalcLambdaDSumNCrossRhoRotHdSDRho(
-			std::unordered_map<std::string, Element*>* elements,
-			const ub::vector<std::complex<double>>* rhoVec,
-			const std::vector<Eigen::VectorXcd>* HresultTwoItr,
-			const std::vector<Element*>* calcElementsVector,
-			int numOfCalcElements,
-			int numOfInvertedResisElem,
-			const Eigen::VectorXcd* lambdaEachOmega,
-			Eigen::VectorXcd* lambdaDRDRho);
+		void CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std::string, Element*>* elements, const ub::vector<complex<double>>* rhoVec,
+			const vector<Eigen::VectorXcd>* HresultTwoItr, const vector<Element*>* calcElementsVector,
+			const int numOfCalcElements, const int numOfInvertedResisElem, const Eigen::VectorXcd* lambdaEachOmega, Eigen::VectorXcd* lambdaDRDRho);
 
 		void CalcSumDivergence(std::unordered_map<std::string, Element*>& elements, Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>& divergenceOperator, Eigen::SparseMatrix<double, Eigen::RowMajor>& divGradMatrix, Eigen::SparseMatrix<double, Eigen::RowMajor>& gradOperatorMatrix);
 		void CalcDivergence(int i, std::unordered_map<std::string, Element*>& elements, Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>& divergenceOperator, Eigen::SparseMatrix<double, Eigen::RowMajor>& divGradMatrix, Eigen::SparseMatrix<double, Eigen::RowMajor>& gradOperatorMatrix);
@@ -233,8 +216,5 @@ namespace Element {
 
 		void GetChildrenElements(unordered_map<string, Element*>* elements,vector<Element*>& elemVec);
 
-
-
-		void BuildRhoSurfaceCache(const std::vector<Element*>* calcElementsVector);
-			};
+	};
 }

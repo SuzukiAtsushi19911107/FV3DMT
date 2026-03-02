@@ -2615,16 +2615,16 @@ ub::matrix<kv::autodif<kv::complex<double>>> Element::Element::CalcDEDRho(ub::ve
 	return tmpE;
 }
 void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std::string, Element*>* elements, const ub::vector<complex<double>>* rhoVec,
-	const vector<Eigen::VectorXcd>* HresultTwoItr, const vector<Element*>* calcElementsVector,
+	const vector<Eigen::VectorXcd>* HresultTwoItr,const vector<Element*>* calcElementsVector,
 	const int numOfCalcElements, const int numOfInvertedResisElem, const Eigen::VectorXcd* lambdaEachOmega, Eigen::VectorXcd* lambdaDRDRho) {
 	//密ベクトルでautodifを計算するとメモリを食いすぎるので、indexと値を保存
 	ub::vector<kv::autodif<complex<double>>>rhoVecSparse;
-
+	
 	if (boundary != "NOT_BOUNDARY") {
 		return;
 	}
 	//count num of nonzero
-
+	
 	if (nonZeroRowIndices.size() == 0) {
 		for (int i = 0; i < 6; i++) {
 			for (int j = 0; j < resistivitySurfaceCoeff[i]->outerSize(); ++j) {
@@ -2642,7 +2642,7 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 						nonZeroRowIndices.push_back(iCol);
 
 					}
-
+					
 				}
 			}
 		}
@@ -2655,7 +2655,7 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 		}
 	}
 
-
+	
 	//initialize
 	ub::vector<complex<double>>rhoVecSparseTmp(nonZeroRowIndices.size());
 	for (int i = 0; i < nonZeroRowIndices.size(); i++) {
@@ -2679,14 +2679,14 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 			kv::autodif<complex<double>> rho;
 			for (int j = 0; j < nonZeroRowIndices.size(); j++) {
 				//rho += resistivitySurfaceCoeff[i]->coeff(0,nonZeroRowIndices[j]).real()*rhoVecSparse(j); 
-				if (interpolateLogScale == false || flg == false) {
+				if (interpolateLogScale == false || flg==false) {
 					rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real() * rhoVecSparse(j);
 				}
 				else {
-					rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real() * log(rhoVecSparse(j));
+					rho += resistivitySurfaceCoeff[i]->coeff(0, nonZeroRowIndices[j]).real() * log (rhoVecSparse(j));
 				}
 			}
-			if (interpolateLogScale && flg == true) {
+			if (interpolateLogScale && flg==true) {
 				rho = exp(rho);
 			}
 			//rho = rho / rhoVecSparse(maxResisIndex) / dx / dy / dz; //rhoVecSparse(indexMyself)/dx/dy/dz is for Standardization
@@ -2719,21 +2719,21 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 			rotHdSVal.setZero();
 			for (int ii = 0; ii < 3; ii++) {
 				for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(rotHdS[i], ii); it; ++it) {
-					rotHdSVal.coeffRef(ii) += rotHdS[i].coeff(ii, it.col()) * (*HresultTwoItr)[itr].coeff(it.col());
+					rotHdSVal.coeffRef(ii) += rotHdS[i].coeff(ii, it.col())*(*HresultTwoItr)[itr].coeff(it.col());
 				}
 			}
 			//rotHdSVal = rotHdS[i] * (*HresultTwoItr)[itr];
 
 
 
-			dSumNCrossRhoRotHdSRhoSparse(1) += rho * (pos.coeff(2) * rotHdSVal.coeff(0));
-			dSumNCrossRhoRotHdSRhoSparse(2) += -rho * (pos.coeff(1) * rotHdSVal.coeff(0));
+			dSumNCrossRhoRotHdSRhoSparse(1) += rho * (pos.coeff(2)*rotHdSVal.coeff(0));
+			dSumNCrossRhoRotHdSRhoSparse(2) += -rho * (pos.coeff(1)*rotHdSVal.coeff(0));
 
-			dSumNCrossRhoRotHdSRhoSparse(0) += -rho * (pos.coeff(2) * rotHdSVal.coeff(1));
-			dSumNCrossRhoRotHdSRhoSparse(2) += rho * (pos.coeff(0) * rotHdSVal.coeff(1));
+			dSumNCrossRhoRotHdSRhoSparse(0) += -rho * (pos.coeff(2)*rotHdSVal.coeff(1));
+			dSumNCrossRhoRotHdSRhoSparse(2) += rho * (pos.coeff(0)*rotHdSVal.coeff(1));
 
-			dSumNCrossRhoRotHdSRhoSparse(0) += rho * (pos.coeff(1) * rotHdSVal.coeff(2));
-			dSumNCrossRhoRotHdSRhoSparse(1) += -rho * (pos.coeff(0) * rotHdSVal.coeff(2));
+			dSumNCrossRhoRotHdSRhoSparse(0) += rho * (pos.coeff(1)*rotHdSVal.coeff(2));
+			dSumNCrossRhoRotHdSRhoSparse(1) += -rho * (pos.coeff(0)*rotHdSVal.coeff(2));
 
 			//for (int j = 0; j < rotHdS[i].outerSize(); ++j) {
 			//	for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(rotHdS[i], j); it; ++it) {
@@ -2770,13 +2770,13 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 				}
 			}
 		}
-
+		
 
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < nonZeroRowIndices.size(); j++) {
 				int invertedRhoID = (*calcElementsVector)[nonZeroRowIndices[j]]->invertedRhoElementsID;
 				if (invertedRhoID >= 0 && (dSumNCrossRhoRotHdSRhoSparse(i).d(j).real() != 0.0 || dSumNCrossRhoRotHdSRhoSparse(i).d(j).imag() != 0.0)) {
-					lambdaDRDRho->coeffRef(invertedRhoID) += std::conj(lambdaEachOmega->coeff(itr * 3 * numOfCalcElements + 3 * calcID + i)) * dSumNCrossRhoRotHdSRho.coeff(i, invertedRhoID);
+					lambdaDRDRho->coeffRef(invertedRhoID) += std::conj(lambdaEachOmega->coeff(itr * 3 * numOfCalcElements + 3 * calcID + i))*dSumNCrossRhoRotHdSRho.coeff(i, invertedRhoID);
 				}
 			}
 		}
@@ -2785,7 +2785,6 @@ void Element::Element::CalcLambdaDSumNCrossRhoRotHdSDRho(std::unordered_map<std:
 
 	return;
 }
-
 
 
 void Element::Element::CalcT(int iOmega) {
@@ -4263,42 +4262,4 @@ void Element::Element::GetChildrenElements(unordered_map<string, Element*>* elem
 	else {
 		elemVec.push_back(this);
 	}
-}
-
-void Element::Element::BuildRhoSurfaceCache(const std::vector<Element*>* calcElementsVector)
-{
-    // boundary判定は呼び出し側でやっても良い
-    if (rhoSurfCacheBuilt) return;
-
-    // surfaceごとのlog有効判定を固定化
-    for (int isurf = 0; isurf < 6; ++isurf) {
-        bool flg = true;
-        for (int ii = 0; ii < (int)notInterpolateLogScaleSurfaces.size(); ++ii) {
-            if (notInterpolateLogScaleSurfaces[ii] == isurf) { flg = false; break; }
-        }
-        rhoSurfUseLog[isurf] = (interpolateLogScale && flg);
-        rhoSurfEntries[isurf].clear();
-    }
-
-    // resistivitySurfaceCoeff から (globalIdx, invID, coeff) を1回だけ抽出
-    for (int isurf = 0; isurf < 6; ++isurf) {
-        for (int j = 0; j < resistivitySurfaceCoeff[isurf]->outerSize(); ++j) {
-            for (Eigen::SparseMatrix<std::complex<double>, Eigen::RowMajor>::InnerIterator it(*resistivitySurfaceCoeff[isurf], j); it; ++it)
-            {
-                const int iCol = it.col();
-                const double c = resistivitySurfaceCoeff[isurf]->coeff(0, iCol).real();
-                if (c == 0.0) continue;
-
-                const int invID = (*calcElementsVector)[iCol]->invertedRhoElementsID;
-                if (invID < 0) continue;
-
-                rhoSurfEntries[isurf].push_back({ iCol, invID, c });
-
-                // nonZeroRowIndices を使うならここで union を作っても良いが、
-                // 今回はこのキャッシュがあれば非必須
-            }
-        }
-    }
-
-    rhoSurfCacheBuilt = true;
 }

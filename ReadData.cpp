@@ -16,6 +16,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #include "UnstructuredElement.h"
 #include <iostream>
 #include <sstream>
+#define strcasecmp _stricmp
 
 ReadData::ReadData::ReadData() {
 	invSettings = new InvSettings::InvSettings(0);

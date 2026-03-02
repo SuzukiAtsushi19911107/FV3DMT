@@ -341,8 +341,10 @@ void Analysis::Analysis::CalcForward(bool isCalcInversionValues, bool isCalcJaco
 		}
 		ClearHAndE();
 	}
+
 	output->ImpedanceOutputSurface(boundary->omega, &elements);
 	output->TipperOutputSurface(boundary->omega, &elements);
+
 	Eigen::setNbThreads(1);
 }
 void Analysis::Analysis::SetH(int iOmega) {
@@ -441,7 +443,7 @@ void Analysis::Analysis::Initialize() {
 
 
 
-	//iterativeSolverVector.resize(2* boundary->omega.size());
+	iterativeSolverVector.resize(2* boundary->omega.size());
 	//globalVectorEachThread.resize(omp_get_max_threads());
 	//globalVectorAdjointEachThread.resize(omp_get_max_threads());
 
@@ -450,6 +452,31 @@ void Analysis::Analysis::Initialize() {
 	SetSolverOrder();
 
 
+	for (int i = 0; i < 2*boundary->omega.size(); i++) {
+		bool flg;
+		flg = false;
+		/*if (i < boundary->omega.size()) {
+			flg = false;
+			iterativeSolverVector[i] = new BiCGSafe::BiCGSafe(2, 3 * numOfCalcElements, flg);
+		}
+		else {
+			flg = false;
+			iterativeSolverVector[i] = new BiCGSafe::BiCGSafe(2, 3 * numOfCalcElements, flg);
+		}*/
+		iterativeSolverVector[i] = new BiCGSafe::BiCGSafe(2, 3 * numOfCalcElements);
+
+		iterativeSolverVector[i]->m_maxIteration = invSettings->maxIterationBiCGSafe;
+		iterativeSolverVector[i]->m_relSolTol = invSettings->toleranceIterativeSolver;
+		if (invSettings->toleranceIterativeSolverAdjoint < 0.0) {
+			iterativeSolverVector[i]->m_relSolTolForAdjoint = iterativeSolverVector[i]->m_relSolTol;
+		}
+		iterativeSolverVector[i]->m_relSolTolForAdjoint = invSettings->toleranceIterativeSolverAdjoint;
+
+		iterativeSolverVector[i]->calcElementsVector = &calcElementsVector;
+		iterativeSolverVector[i]->solverToOriginal = &solverOrderToOriginalOrder;
+
+		
+	}
 
 	//if (useMultGrid) {
 	//	SetMultiGridPreconditioner();
@@ -685,6 +712,125 @@ void Analysis::Analysis::solve(int iOmega,int itr) {
 void Analysis::Analysis::Solve_iterative(int iOmega,int threadID) {
 
 
+	//Eigen::SparseMatrix<double, Eigen::RowMajor> prunedMat{ 3 * numOfCalcElements,3 * numOfCalcElements };
+	//prunedMat = *globalMatrixNoOmegaTerm;
+	//prunedMat.prune(0.0);
+	//prunedMat.makeCompressed();
+
+	//divergence correction in subsurface, now which is included in makeMatrix();
+
+
+	//Eigen::SparseMatrix<double, Eigen::RowMajor> factorMat;
+	//factorMat.resize(numOfCalcElements, numOfCalcElements);
+	//factorMat.reserve(Eigen::VectorXi::Constant(numOfCalcElements, 1));
+	//for (int i = 0; i < numOfCalcElements; i++) {
+	//	if (!calcElementsVector[i]->calcGradDivOperationElement && calcElementsVector[i]->boundary == "NOT_BOUNDARY") {
+	//		//double ave = 0;
+	//		double resis;
+	//		if (calcElementsVector[i]->property->type == Property::Property::AIR) {
+	//			/*resis = 0.0;
+	//			for (int j = 0; j < 6; j++) {
+
+	//				resis += (*calcElementsVector[i]->resistivitySurface)[j] / 6.0;
+	//			}*/
+	//			resis = 0.0;
+	//			for (int j = 0; j < 6; j++) {
+	//				for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(*(calcElementsVector[i]->resistivitySurfaceCoeff[j]), 0); it; ++it) {
+	//					if (resis < calcElementsVector[it.col()]->resistivity) {
+	//						resis = calcElementsVector[it.col()]->resistivity;
+	//					}
+	//				}
+	//				//ave += (*calcElementsVector[i]->resistivitySurface)[j];
+	//			}
+	//			calcElementsVector[i]->factorForDivCorr = resis;
+	//		}
+	//		else {
+	//			resis = 1e30;
+	//			for (int j = 0; j < 6; j++) {
+	//				for (Eigen::SparseMatrix<complex<double>, Eigen::RowMajor>::InnerIterator it(*(calcElementsVector[i]->resistivitySurfaceCoeff[j]), 0); it; ++it) {
+	//					if (resis > calcElementsVector[it.col()]->resistivity) {
+	//						resis = calcElementsVector[it.col()]->resistivity;
+	//					}
+	//				}
+	//				//ave += (*calcElementsVector[i]->resistivitySurface)[j];
+	//			}
+	//			calcElementsVector[i]->factorForDivCorr = invSettings->safetyFactor * resis;// *min(1.0, sqrt(boundary->omega[iOmega]));
+	//		}
+
+	//		/*resis = 0.0;
+	//		for (int j = 0; j < 6; j++) {
+	//			resis += (*calcElementsVector[i]->resistivitySurface)[j]/6.0;
+	//		}*/
+	//		//double mid = exp((log(calcElementsVector[i]->resistivity) + log(boundary->omega[iOmega] * mu)) / 2.0);
+
+
+
+
+	//		factorMat.coeffRef(i, i) = -calcElementsVector[i]->factorForDivCorr;
+	//		/*factorMat.coeffRef(3*i, 3*i) = -calcElementsVector[i]->factorForDivCorr;
+	//		factorMat.coeffRef(3 * i + 1, 3 * i + 1) = -calcElementsVector[i]->factorForDivCorr;
+	//		factorMat.coeffRef(3 * i +2, 3 * i + 2) = -calcElementsVector[i]->factorForDivCorr;*/
+	//		//*minResis;// calcElementsVector[i]->resistivity;
+	//	}
+	//}
+
+	//precond
+
+	//Eigen::SparseMatrix<complex<double>, Eigen::RowMajor> precondMat{ 3 * numOfCalcElements,3 * numOfCalcElements };
+	//
+	//vector < Eigen::Triplet<complex<double>>> precondMatTriplet;
+	//precondMatTriplet.reserve(3 * numOfCalcElements * 90);
+
+	//for (int i = 0; i < 3 * numOfCalcElements; i++) {
+	//	Element::Element* element = calcElementsVector[int(solverOrderToOriginalOrder[i] / 3)];
+	//	double dv = element->dv;
+	//	for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(*globalMatrixNoOmegaTerm, i); it; ++it) {
+
+
+	//		int solRow = i;
+	//		int solCol = it.col();
+
+	//		int oriRow = solverOrderToOriginalOrder[solRow];
+	//		int oriCol = solverOrderToOriginalOrder[solCol];
+
+
+	//		/*if (solRow < numOfCalcElements && solCol >= numOfCalcElements) {
+	//			continue;
+	//		}
+	//		else if ((solRow >= numOfCalcElements && solRow < 2*numOfCalcElements) && (solCol < numOfCalcElements || solCol >= 2*numOfCalcElements)) {
+	//			continue;
+	//		}
+	//		else if (solRow >= 2*numOfCalcElements && solCol < 2*numOfCalcElements ) {
+	//			continue;
+	//		}*/
+
+	//		Eigen::Triplet<complex<double>> val(solRow, solCol,
+	//			globalMatrixNoOmegaTerm->coeff(solRow, solCol) +
+	//			double(int(element->boundary == "NOT_BOUNDARY" && !element->calcGradDivOperationElement && oriRow == oriCol)) *
+	//			complex<double>(0, boundary->omega[iOmega] * mu * dv) +
+
+	//			double(int(element->boundary == "NOT_BOUNDARY" && element->calcGradDivOperationElement && oriRow == oriCol)) *
+	//			complex<double>(0, 1.0 / element->resistivity * boundary->omega[iOmega] * mu * dv));
+
+	//		precondMatTriplet.push_back(val);
+	//	}
+
+	//}
+
+
+
+	//precondMat.setFromTriplets(precondMatTriplet.begin(), precondMatTriplet.end());
+	//precondMat.pruned();
+
+	
+
+
+	//precondMat = diagMat * precondMat;
+	//iterativeSolverVector[iOmega]->precond.compute(precondMat);
+
+	// end precond
+
+
 	
 	//Eigen::SparseMatrix<double, Eigen::RowMajor> globalMatrixToBeSolvedReal;
 	//globalMatrixToBeSolvedReal.resize(3 * numOfCalcElements, 3 * numOfCalcElements);
@@ -817,35 +963,37 @@ void Analysis::Analysis::Solve_iterative(int iOmega,int threadID) {
 			sol[0].setZero();
 			sol[1].setZero();
 		}
-		BiCGSafe::BiCGSafe iterativeSolver{ 2, 3 * numOfCalcElements };
+		//Eigen::SparseMatrix < complex<double>, Eigen::RowMajor> mat;
+		//mat.resize(3 * numOfCalcElements, 3 * numOfCalcElements );
+		//mat.reserve(Eigen::VectorXi::Constant(3 * numOfCalcElements, 100));
+		//for (int i = 0; i < 3 * numOfCalcElements; i++) {
+		//	Element::Element* element = calcElementsVector[int(i / 3)];
+		//	for (Eigen::SparseMatrix<double, Eigen::RowMajor>::InnerIterator it(*globalMatrixNoOmegaTerm, i); it; ++it) {
+		//		mat.coeffRef(i, it.col()) = globalMatrixNoOmegaTerm->coeff(i, it.col()) + globalMatrixToBeSolvedImag.coeff(i, it.col());
+		//	}
+		//}
+		//mat.makeCompressed();
+		//iterativeSolverVector[iOmega]->solve(&mat, &sol, &rhs, iterativeSolverVector[iOmega]->m_relSolTol, false);
+		//
+		iterativeSolverVector[iOmega]->omega = boundary->omega[iOmega];
+		iterativeSolverVector[iOmega]->precond.compute(*globalMatrixNoOmegaTerm, globalMatrixToBeSolvedImag);
+		//if (useMultGrid) {
+		//	iterativeSolverVector[iOmega]->precond_multi.compute(*globalMatrixNoOmegaTerm, globalMatrixToBeSolvedImag);
+		//}
+		//else {
+		//	iterativeSolverVector[iOmega]->precond.compute(*globalMatrixNoOmegaTerm, globalMatrixToBeSolvedImag);
+		//}
+		iterativeSolverVector[iOmega]->solve(globalMatrixNoOmegaTerm, &globalMatrixToBeSolvedImag,&sol, &rhs, iterativeSolverVector[iOmega]->m_relSolTol, false);
 
-		iterativeSolver.m_maxIteration = invSettings->maxIterationBiCGSafe;
-		iterativeSolver.m_relSolTol = invSettings->toleranceIterativeSolver;
-			if (invSettings->toleranceIterativeSolverAdjoint < 0.0) {
-				iterativeSolver.m_relSolTolForAdjoint = iterativeSolver.m_relSolTol;
-			}
-			iterativeSolver.m_relSolTolForAdjoint = invSettings->toleranceIterativeSolverAdjoint;
+		//iterativeSolverVector[iOmega]->solve(&precondMat, &sol, &rhs, iterativeSolverVector[iOmega]->m_relSolTol, false);
 
-			iterativeSolver.calcElementsVector = &calcElementsVector;
-			iterativeSolver.solverToOriginal = &solverOrderToOriginalOrder;
-
-
-		
-
-		iterativeSolver.omega = boundary->omega[iOmega];
-		iterativeSolver.precond.compute(*globalMatrixNoOmegaTerm, globalMatrixToBeSolvedImag);
-
-		iterativeSolver.solve(globalMatrixNoOmegaTerm, &globalMatrixToBeSolvedImag,&sol, &rhs, iterativeSolver.m_relSolTol, false);
-
-
-
-		if (isFirstLambdaAndLoop == false && iterativeSolver.m_maxIteration == iterativeSolver.m_iters) {
+		if (isFirstLambdaAndLoop == false && iterativeSolverVector[iOmega]->m_maxIteration == iterativeSolverVector[iOmega]->m_iters) {
 			std::cout << "In BiCGSafe Solution NOT Converged!!! Restart Without  Solution Guess." << std::endl;
 			sol[0].setZero();
 			sol[1].setZero();
-			iterativeSolver.solve(globalMatrixNoOmegaTerm, &globalMatrixToBeSolvedImag, &sol, &rhs, iterativeSolver.m_relSolTol, false);
+			iterativeSolverVector[iOmega]->solve(globalMatrixNoOmegaTerm, &globalMatrixToBeSolvedImag, &sol, &rhs, iterativeSolverVector[iOmega]->m_relSolTol, false);
 		}
-		if (iterativeSolver.m_maxIteration == iterativeSolver.m_iters) {
+		if (iterativeSolverVector[iOmega]->m_maxIteration == iterativeSolverVector[iOmega]->m_iters) {
 			std::cout << "WARNING!!!!!!!!!!!!!!!! In BiCGSafe Solution NOT Converged!!!" << std::endl;
 		}
 
@@ -867,11 +1015,24 @@ void Analysis::Analysis::Solve_iterative(int iOmega,int threadID) {
 
 
 		std::cout << "In BiCGSafe Period:     " << 2 * pi / boundary->omega[iOmega] << std::endl;
-		std::cout << "In BiCGSafe #iterations:     " << iterativeSolver.m_iters << std::endl;
-		std::cout << "In BiCGSafe estimated error: " << iterativeSolver.m_error << std::endl;
-		std::cout << "In BiCGSafe Last Iteration, Relative Change of Solution:" << iterativeSolver.m_lastRelativeSolChange << std::endl;
-		
-		iterativeSolver.precond.release_memory(false);
+		std::cout << "In BiCGSafe #iterations:     " << iterativeSolverVector[iOmega]->m_iters << std::endl;
+		std::cout << "In BiCGSafe estimated error: " << iterativeSolverVector[iOmega]->m_error << std::endl;
+		std::cout << "In BiCGSafe Last Iteration, Relative Change of Solution:" << iterativeSolverVector[iOmega]->m_lastRelativeSolChange << std::endl;
+		//debug
+
+
+		/*int numOfCalcElements = itetativeSolverVector[iOmega]->rReturn[0].size() / 3;
+		for (int i = 0; i < 3; i++) {
+			for (int k = 0; k < 2; k++) {
+				Eigen::VectorXd outputRes{ numOfCalcElements };
+				for (int j = 0; j < numOfCalcElements; j++) {
+					outputRes.coeffRef(j) = abs(itetativeSolverVector[iOmega]->rReturn[k].coeff(i * numOfCalcElements + j));
+				}
+				string filename = "residual_iter_Direction_" + to_string(k) + "_" + to_string(i) + ".vtk";
+				output->VTKFileOputput(&calcElementsVector, &outputRes, filename);
+			}
+
+		}*/
 
 
 	}
@@ -2154,40 +2315,32 @@ void Analysis::Analysis::CalcLambda(int iOmega, int threadID,bool onePointMode) 
 			sol[1].setZero();
 		}
 
-		BiCGSafe::BiCGSafe iterativeSolver{ 2, 3 * numOfCalcElements };
-
-		iterativeSolver.m_maxIteration = invSettings->maxIterationBiCGSafe;
-		iterativeSolver.m_relSolTol = invSettings->toleranceIterativeSolver;
+		iterativeSolverVector[boundary->omega.size() + iOmega]->omega = boundary->omega[iOmega];
+		iterativeSolverVector[boundary->omega.size() + iOmega]->m_maxIteration = invSettings->maxIterationBiCGSafe;
+		iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTol = invSettings->toleranceIterativeSolver;
+		iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTolForAdjoint = invSettings->toleranceIterativeSolverAdjoint;
 		if (invSettings->toleranceIterativeSolverAdjoint < 0.0) {
-			iterativeSolver.m_relSolTolForAdjoint = iterativeSolver.m_relSolTol;
-		}
-		iterativeSolver.m_relSolTolForAdjoint = invSettings->toleranceIterativeSolverAdjoint;
-
-		iterativeSolver.calcElementsVector = &calcElementsVector;
-		iterativeSolver.solverToOriginal = &solverOrderToOriginalOrder;
-
-
-		
-
-		iterativeSolver.omega = boundary->omega[iOmega];
-		iterativeSolver.m_maxIteration = invSettings->maxIterationBiCGSafe;
-		iterativeSolver.m_relSolTol = invSettings->toleranceIterativeSolver;
-		iterativeSolver.m_relSolTolForAdjoint = invSettings->toleranceIterativeSolverAdjoint;
-		if (invSettings->toleranceIterativeSolverAdjoint < 0.0) {
-			iterativeSolver.m_relSolTolForAdjoint = iterativeSolver.m_relSolTol;
+			iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTolForAdjoint = iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTol;
 		}
 		//==============Solve H1,H2 together===============================================
-		iterativeSolver.precond.compute(*globalMatrixNoOmegaTermAdjoint, globalMatrixToBeSolvedImag);
+		iterativeSolverVector[boundary->omega.size() + iOmega]->precond.compute(*globalMatrixNoOmegaTermAdjoint, globalMatrixToBeSolvedImag);
+		/*if (useMultGrid) {
+			iterativeSolverVector[boundary->omega.size() + iOmega]->precond_multi.compute(*globalMatrixNoOmegaTermAdjoint, globalMatrixToBeSolvedImag);
 
-		iterativeSolver.solve(globalMatrixNoOmegaTermAdjoint, &globalMatrixToBeSolvedImag, &sol, &rhs, iterativeSolver.m_relSolTolForAdjoint, false);
+		}
+		else {
+			iterativeSolverVector[boundary->omega.size() + iOmega]->precond.compute(*globalMatrixNoOmegaTermAdjoint, globalMatrixToBeSolvedImag);
+
+		}*/
+		iterativeSolverVector[boundary->omega.size() + iOmega]->solve(globalMatrixNoOmegaTermAdjoint, &globalMatrixToBeSolvedImag, &sol, &rhs, iterativeSolverVector[boundary->omega.size() + iOmega]->m_relSolTolForAdjoint, false);
 		
-		if (iterativeSolver.m_maxIteration == iterativeSolver.m_iters) {
+		if (iterativeSolverVector[boundary->omega.size() + iOmega]->m_maxIteration == iterativeSolverVector[boundary->omega.size() + iOmega]->m_iters) {
 			std::cout << "WARNING!!!!!!!!!!!!!!!! In BiCGSafe Solution NOT Converged!!!" << std::endl;
 		}
 		std::cout << "In BiCGSafe Period:     " << 2*pi/boundary->omega[iOmega] << std::endl;
-		std::cout << "In BiCGSafe #iterations:     " << iterativeSolver.m_iters << std::endl;
-		std::cout << "In BiCGSafe estimated error: " << iterativeSolver.m_error << std::endl;
-		std::cout << "In BiCGSafe Last Iteration, Relative Change of Solution:" << iterativeSolver.m_lastRelativeSolChange << std::endl;
+		std::cout << "In BiCGSafe #iterations:     " << iterativeSolverVector[boundary->omega.size() + iOmega]->m_iters << std::endl;
+		std::cout << "In BiCGSafe estimated error: " << iterativeSolverVector[boundary->omega.size() + iOmega]->m_error << std::endl;
+		std::cout << "In BiCGSafe Last Iteration, Relative Change of Solution:" << iterativeSolverVector[boundary->omega.size() + iOmega]->m_lastRelativeSolChange << std::endl;
 				
 
 		for (int i = 0; i < 3 * numOfCalcElements; i++) {
@@ -2207,8 +2360,6 @@ void Analysis::Analysis::CalcLambda(int iOmega, int threadID,bool onePointMode) 
 			lambdaEachOmega[iOmega]->coeffRef(i) = sol[0].coeff(solRow);
 			lambdaEachOmega[iOmega]->coeffRef(3 * numOfCalcElements + i) = sol[1].coeff(solRow);
 		}
-
-		iterativeSolver.precond.release_memory(false);
 		
 	}
 }
@@ -2222,65 +2373,119 @@ void Analysis::Analysis::SearchRelatedCalcElements() {
 		}
 	}
 }
-void Analysis::Analysis::CalcLambdaDRDRho(
-    const ub::vector<std::complex<double>>* rhoVec,
-    const std::vector<Eigen::VectorXcd>* HresultItr,
-    int iOmega)
-{
-    const time_t start_t = time(nullptr);
 
-    // Detect actual number of OpenMP threads used.
-    int numThreadsUsed = 1;
-#pragma omp parallel
-    {
-#pragma omp single
-        numThreadsUsed = omp_get_num_threads();
-    }
+void Analysis::Analysis::CalcLambdaDRDRho(const ub::vector<complex<double>>* rhoVec, const vector<Eigen::VectorXcd>* HresultItr,int iOmega) {
+	
+	int numThreads = omp_get_max_threads();
 
-    // Ensure per-thread buffers exist and are zeroed.
-    lambdaDRDRhoEachThread.resize(numThreadsUsed);
-    for (int t = 0; t < numThreadsUsed; ++t) {
-        if (lambdaDRDRhoEachThread[t].size() != numOfInvertedResistivityElements) {
-            lambdaDRDRhoEachThread[t].resize(numOfInvertedResistivityElements);
-        }
-        lambdaDRDRhoEachThread[t].setZero();
-    }
+	//Analysis::Analysis::CalcLambdaDRDRhoParameters valForLambdaDRDRho;
+	////if (valForLambdaDRDRho.isInitialized == false) {
+	//	int maxLayer = 0;
+	//	valForLambdaDRDRho.threadIDGroup.resize(numThreads);
+	//	int numOfNotBoundaryElements = 0;
+	//	for (auto itr = calcElementsVector.begin(); itr != calcElementsVector.end(); itr++) {
+	//		Element::Element* element = *itr;
+	//		if (element->layer > maxLayer) {
 
-    // Ensure output is zeroed.
-    lambdaDRDRho.setZero();
+	//			maxLayer = element->layer;
+	//		}
+	//	}
+	//	valForLambdaDRDRho.maxLayer = maxLayer;
 
-#pragma omp parallel for schedule(static)
-    for (int i = 0; i < numOfCalcElements; ++i) {
-        const int tid = omp_get_thread_num();
-        Element::Element* element = calcElementsVector[i];
-        if (!element) {
-            // Defensive: skip null pointers.
-            continue;
-        }
+	//	for (int iLayer = 0; iLayer <= maxLayer; iLayer++) {
+	//		vector < Element::Element* > layerElementsVector;
+	//		for (int i = 0; i < calcElementsVector.size(); i++) {
+	//			Element::Element* element = calcElementsVector[i];
+	//			if (element->layer == iLayer && element->boundary == "NOT_BOUNDARY") {
+	//				layerElementsVector.push_back(element);
+	//				numOfNotBoundaryElements++;
+	//			}
+	//		}
+	//		valForLambdaDRDRho.sameLayerElementsVector.push_back(layerElementsVector);
+	//	}
 
-        element->CalcLambdaDSumNCrossRhoRotHdSDRho(
-            &elements,
-            rhoVec,
-            HresultItr,
-            &calcElementsVector,
-            numOfCalcElements,
-            numOfInvertedResistivityElements,
-            lambdaEachOmega[iOmega],
-            &lambdaDRDRhoEachThread[tid]
-        );
-    }
+	//	for (int iLayer = maxLayer; iLayer >= 0; iLayer--) {
+	//		vector < Element::Element* >tmpVector = valForLambdaDRDRho.sameLayerElementsVector[iLayer];
+	//		for (int i = 0; i < tmpVector.size(); i++) {
+	//			Element::Element* element = valForLambdaDRDRho.sameLayerElementsVector[iLayer][i];
+	//			valForLambdaDRDRho.threadIDGroup[i%numThreads].push_back(element->calcID);
+	//		}
+	//	}
+	//	valForLambdaDRDRho.isInitialized = true;
+	////}
 
-    time_t end_t = time(nullptr);
-    std::cout << "Parallel Part Calculation Time: " << (end_t - start_t) << " Seconds.\n";
 
-    // Reduction (serial): sum per-thread buffers.
-    for (int t = 0; t < numThreadsUsed; ++t) {
-        lambdaDRDRho += lambdaDRDRhoEachThread[t];
-    }
+	//Multi Thread
+	//vector<Eigen::VectorXcd> lambdaDRDRhoEachThread(numThreads);
+	//for (int i = 0; i < numThreads; i++) {
+	//	lambdaDRDRhoEachThread[i].resize(numOfInvertedResistivityElements);
+	//	lambdaDRDRhoEachThread[i].setZero();
+	//}
 
-    end_t = time(nullptr);
-    std::cout << "Total Calc Lambda DRDRho Time: " << (end_t - start_t) << " Seconds.\n";
+		
+	//}
+
+
+	time_t start_t = time(NULL);
+
+	//vector<Eigen::VectorXcd> lambdaDRDRhoEachThread(numThreads);
+	//for (int i = 0; i < numThreads; i++) {
+	//	lambdaDRDRhoEachThread[i] = Eigen::VectorXcd(numOfInvertedResistivityElements);
+	//	lambdaDRDRhoEachThread[i].setZero();
+	//}
+
+	
+//	for (int iLayer = valForLambdaDRDRho.maxLayer; iLayer >= 0; iLayer--) {
+//#pragma omp parallel for
+//		for (int i = 0; i < numThreads; i++) {
+//			for (int j = 0; j < valForLambdaDRDRho.threadIDGroup[i].size(); j++) {
+//				Element::Element* element = calcElementsVector[valForLambdaDRDRho.threadIDGroup[i][j]];
+//				if (element->layer == iLayer) {
+//					element->CalcLambdaDSumNCrossRhoRotHdSDRho(&elements, rhoVecUb, HresultItr, calcElementsVector, numOfCalcElements, numOfInvertedResistivityElements, lambdaEachOmega, &lambdaDRDRhoEachThread[i]);
+//				}
+//			}
+//		}
+//	}
+
+	for (int i = 0; i < numThreads; i++) {
+		if (lambdaDRDRhoEachThread[i].size() == 0) {
+			lambdaDRDRhoEachThread[i].resize(numOfInvertedResistivityElements);
+		}
+		lambdaDRDRhoEachThread[i].setZero();
+	}
+
+	//Eigen::setNbThreads(1);
+#pragma omp parallel for
+	for (int i = 0; i < numOfCalcElements; i++) {
+		Element::Element* element = calcElementsVector[i];
+		element->CalcLambdaDSumNCrossRhoRotHdSDRho(&elements, rhoVec, HresultItr, &calcElementsVector, numOfCalcElements, numOfInvertedResistivityElements, lambdaEachOmega[iOmega], &lambdaDRDRhoEachThread[omp_get_thread_num()]);
+		//element->CalcLambdaDSumNCrossRhoRotHdSDRho(&elements, rhoVec, HresultItr, calcElementsVector, numOfCalcElements, numOfInvertedResistivityElements, lambdaEachOmega, &lambdaDRDRho);
+
+	}
+
+	time_t end_t = time(NULL);
+	std::cout << "Parallel Part Calculation Time:" << end_t - start_t << " Seconds." << endl;
+
+	for (int i = 0; i < numThreads; i++) {
+		lambdaDRDRho += lambdaDRDRhoEachThread[i];
+	}
+
+
+	//Single Thread
+	//time_t start_t = time(NULL);
+	//for (int iLayer = valForLambdaDRDRho.maxLayer; iLayer >= 0; iLayer--) {
+	//	for (int j = 0; j < numOfCalcElements; j++) {
+	//		Element::Element* element = calcElementsVector[j];
+	//		if (element->layer == iLayer) {
+	//			element->CalcLambdaDSumNCrossRhoRotHdSDRho(&elements, rhoVecUb, HresultItr, calcElementsVector, numOfCalcElements, numOfInvertedResistivityElements, lambdaEachOmega, lambdaDRDRho);
+	//		}
+	//	}
+	//}
+
+	end_t = time(NULL);
+	std::cout << "Total Calc Lambda DRDRho Time:" << end_t - start_t << " Seconds." << endl;
 }
+
 void Analysis::Analysis::SetInvertedElements() {
 	//テスト
 	//for (int i = 0; i < numOfObsPointElements; i++) {
@@ -3474,7 +3679,7 @@ inline double Analysis::Analysis::Optimize(const Eigen::VectorXd& vals_inp, Eige
 	obj_val = CalcDataMisfit();
 	RMS = std::pow(obj_val / numOfObsData, 0.5);
 	
-
+	
 	std::cout << "DataMisfit:" << obj_val << std::endl;
 
 
@@ -4356,69 +4561,66 @@ void Analysis::Analysis::SetSameResistivityToBoundaryCell() {
 	//}
 }
 bool Analysis::Analysis::CalcRhoFromParamAndDRhoDParam(Eigen::VectorXd paramVec) {
-
+	
 	dRhoDParam.setZero();
 	bool isChangeResis = false;
-
-	const double logMaxResis = std::log(maxResis);
-	const double logMinResis = std::log(minResis);
-
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
+		kv::autodif<double> x;
+		//if (paramVec.coeff(i) > limitOfparamLogNormalization){
+		//	x = kv::autodif<double>::init(limitOfparamLogNormalization);
+		//	dRhoDParam.coeffRef(i) = 1e-3;
+		//}
+		//else if (paramVec.coeff(i) < -limitOfparamLogNormalization) {
+		//	x = kv::autodif<double>::init(-limitOfparamLogNormalization);
+		//	dRhoDParam.coeffRef(i) = 1e-3;
+		//}
+		//else {
 
-		double rho_new = minResis;
-		double drho_new = 0.0;
-
-		if (optMethod == "ISTA") {
-			// ISTA: rho = exp(param), then clamp to [minResis, maxResis]
-			kv::autodif<double> x = kv::autodif<double>::init(paramVec.coeff(i));
-			kv::autodif<double> resis_ad = exp(x);
-
-			rho_new = resis_ad.v;
-			drho_new = resis_ad.d(0);
-
-			// NaN/inf guard
-			if (!std::isfinite(rho_new) || !std::isfinite(drho_new)) {
-				rho_new = (paramVec.coeff(i) > 0.0 ? maxResis : minResis);
-				drho_new = 0.0;
+		double logMaxResis = log(maxResis);
+		double logMinResis = log(minResis);
+		//double logMaxResis = maxResis;
+		//double logMinResis = minResis;
+		x = kv::autodif<double>::init(paramVec.coeff(i));
+		kv::autodif<double> enx = exp(paramLogNormalization*x);
+		//kv::autodif<double> m = (maxResis*enx + minResis) / (1 + enx);
+		kv::autodif<double> m = (logMaxResis*enx + logMinResis) / (1 + enx);
+		kv::autodif<double> resis = pow(std::exp(1.0), m);
+		//kv::autodif<double> resis = m;
+		if (std::isnan(resis.v) == true || std::isnan(resis.d(0))==true) {
+			double resisv;
+			if (paramVec.coeff(i) > 0) {
+				resisv = maxResis;
 			}
-
-			// clamp & keep derivative consistent
-			if (rho_new > maxResis) { rho_new = maxResis; drho_new = 0.0; }
-			if (rho_new < minResis) { rho_new = minResis; drho_new = 0.0; }
-
+			else {
+				resisv = minResis;
+			}
+			invertedRhoIDToElementVector[i]->resistivity = resisv;
+			dRhoDParam.coeffRef(i) = 0.0;
 		}
 		else {
-			// Non-ISTA: logistic in log-space -> rho in [minResis, maxResis]
-			kv::autodif<double> x = kv::autodif<double>::init(paramVec.coeff(i));
-			kv::autodif<double> enx = exp(paramLogNormalization * x);
-			kv::autodif<double> m = (logMaxResis * enx + logMinResis) / (1.0 + enx);
-			kv::autodif<double> resis_ad = exp(m);
-
-			rho_new = resis_ad.v;
-			drho_new = resis_ad.d(0);
-
-			// guard
-			if (!std::isfinite(rho_new) || !std::isfinite(drho_new)) {
-				rho_new = (paramVec.coeff(i) > 0.0 ? maxResis : minResis);
-				drho_new = 0.0;
+			if (preParams[i] != paramVec[i]) {
+				invertedRhoIDToElementVector[i]->resistivity = resis.v;
+				isChangeResis = true;
 			}
-
-
-			if (rho_new > maxResis) { rho_new = maxResis; drho_new = 0.0; }
-			if (rho_new < minResis) { rho_new = minResis; drho_new = 0.0; }
+			dRhoDParam.coeffRef(i) = resis.d(0);
 		}
+		
+		//if (paramVec.coeff(i) >= maxResis) {
+		//	invertedRhoIDToElementVector[i]->resistivity = maxResis;
+		//}
+		//else if (paramVec.coeff(i) <= minResis) {
+		//	invertedRhoIDToElementVector[i]->resistivity = minResis;
+		//}
+		//else {
+		//	invertedRhoIDToElementVector[i]->resistivity = paramVec.coeffRef(i) ;
+		//	isChangeResis = true;
+		//}
+		//dRhoDParam.coeffRef(i) = 1.0;
 
-		dRhoDParam.coeffRef(i) = drho_new;
-
-
-		const double rho_old = invertedRhoIDToElementVector[i]->resistivity;
-		if (rho_old != rho_new) {
-			invertedRhoIDToElementVector[i]->resistivity = rho_new;
-			isChangeResis = true;
-		}
 	}
-
+	
 	preParams = paramVec;
+
 	return isChangeResis;
 }
 Eigen::VectorXd Analysis::Analysis::CalcParamFromRho() {
@@ -4426,30 +4628,17 @@ Eigen::VectorXd Analysis::Analysis::CalcParamFromRho() {
 	paramVec.resize(numOfInvertedResistivityElements);
 	paramVec.setZero();
 	for (int i = 0; i < numOfInvertedResistivityElements; i++) {
-		if (optMethod == "ISTA") {
-			double m = log(invertedRhoIDToElementVector[i]->resistivity);
-			double logMaxResis = log(maxResis);
-			double logMinResis = log(minResis);
-			if (m > logMaxResis) {
-				m = logMaxResis;
-			}
-			else if (m < logMinResis) {
-				m = logMinResis;
-			}
-			paramVec.coeffRef(i) = m;
-		}
-		else {
-			double m = log(invertedRhoIDToElementVector[i]->resistivity);
-			//double m = invertedRhoIDToElementVector[i]->resistivity;
-			//double x = 1 / paramLogNormalization * log((m - minResis) / (maxResis - m));
-			double logMaxResis = log(maxResis);
-			double logMinResis = log(minResis);
-			//double logMaxResis = maxResis;
-			//double logMinResis = minResis;
-			double x = 1 / paramLogNormalization * log((m - logMinResis) / (logMaxResis - m));
-			paramVec.coeffRef(i) = x;
+		double m = log(invertedRhoIDToElementVector[i]->resistivity);
+		//double m = invertedRhoIDToElementVector[i]->resistivity;
+		//double x = 1 / paramLogNormalization * log((m - minResis) / (maxResis - m));
+		double logMaxResis = log(maxResis);
+		double logMinResis = log(minResis);
+		//double logMaxResis = maxResis;
+		//double logMinResis = minResis;
+		double x = 1 / paramLogNormalization * log((m - logMinResis) / (logMaxResis - m));
+		paramVec.coeffRef(i) = x;
 
-		}
+
 		//paramVec.coeffRef(i) = invertedRhoIDToElementVector[i]->resistivity;
 
 	}
