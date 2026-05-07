@@ -56,10 +56,20 @@ namespace ReadData
 		int Nx = 51;
 		int Ny = 51;
 		int Nz = 51;
-		int K = 25;
+		int Kx = 25;
+		int Ky = 25;
+		int Kz = 25;
 		int cells_window = 3;
+		int cells_window_fft_x = -1;
+		int cells_window_fft_y = -1;
+		int cells_window_fft_z = -1;
+		int cells_window_out_x = -1;
+		int cells_window_out_y = -1;
+		int cells_window_out_z = -1;
 		int numEnsemble = 100;
-
+		int corr_cells_x = -1;
+		int corr_cells_y = -1;
+		int corr_cells_z = -1;
 		double minX = -10000;
 		double maxX = 10000;
 		double minY = -10000;
@@ -70,15 +80,30 @@ namespace ReadData
 		double epsR = 0.1;
 		double epsT = 0.0;
 		double eps_window = 0.;
+		double eps_window_fft_x = -1.0;
+		double eps_window_fft_y = -1.0;
+		double eps_window_fft_z = -1.0;
+		double fd_eps = 1.0e-1;
+		double null_sv_ratio_thresh = 1.0e-2;
+		int max_null_directions = 5;
+		int min_null_directions = 3;
+		int max_redraw_trials = 100;
+		int candidate_pool_target = -1;
+		double max_allowed_selected_cosine = 0.7071067811865476;
+		bool first_direction_random = false;
 		double confidenceLevel1 = 0.05; //For line search to seek the solution within these values
 		double confidenceLevel2 = 0.01;
+		double deltaRMSLevel1 = -1.0;
+		double deltaRMSLevel2 = -1.0;
 		double lambda = -1.0;
+		bool isCheckResult = false;
 		bool usePreviousResult = false;
-		string orthogonalize = "objectiveFunction";
+		string orthogonalize = "gd";
+		string replacedResistivityFile = "";
 
-		void ReadFile(std::string modelFileName,bool forwardCalc);
+		void ReadFile(std::string modelFileName, bool forwardCalc);
 		std::string AnalysisTag(std::string line);
-		std::vector<std::string> split( std::string line);
+		std::vector<std::string> split(std::string line);
 		std::vector<std::string> readNext(std::ifstream* f);
 		void AnalysisNodes(std::ifstream* f);
 		void AnalysisElements(std::ifstream* f);
@@ -94,7 +119,7 @@ namespace ReadData
 		void ReadInitialResistivityData(string resisFile);
 		void ReadInitialDistortionData(string distFile);
 		void ReadLocationDataFile(string filename);
-		
+
 	};
 	class HashFromCoordToSize_t {
 	public:

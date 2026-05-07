@@ -230,9 +230,20 @@ namespace Analysis {
 		int Nx = 51;
 		int Ny = 51;
 		int Nz = 51;
-		int K = 25;
+		int Kx = 25;
+		int Ky = 25;
+		int Kz = 25;
 		int cells_window = 3;
+		int cells_window_fft_x = -1;
+		int cells_window_fft_y = -1;
+		int cells_window_fft_z = -1;
+		int cells_window_out_x = -1;
+		int cells_window_out_y = -1;
+		int cells_window_out_z = -1;
 		int numEnsemble = 100;
+		int corr_cells_x = -1;
+		int corr_cells_y = -1;
+		int corr_cells_z = -1;
 
 		double minX = -10000;
 		double maxX = 10000;
@@ -244,15 +255,28 @@ namespace Analysis {
 		double epsR = 0.1;
 		double epsT = 0.0;
 		double eps_window = 0.;
+		double eps_window_fft_x = -1.0;
+		double eps_window_fft_y = -1.0;
+		double eps_window_fft_z = -1.0;
+		double fd_eps = 1.0e-1;
+		double null_sv_ratio_thresh = 1.0e-2;
+		int max_null_directions = 5;
+		int min_null_directions = 3;
+		int max_redraw_trials = 100;
+		int candidate_pool_target = -1;
+		double max_allowed_selected_cosine = 0.7071067811865476;
+		bool first_direction_random = false;
 		double confidenceLevel1 = 0.05; //For line search to seek the solution within these values
 		double confidenceLevel2 = 0.01;
+		double deltaRMSLevel1 = -1.0;
+		double deltaRMSLevel2 = -1.0;
 		double initWidth = 0.1;
 		double lambdaForFFT = -1.0;
+		string replacedResistivityFile = "";
 		bool usePreviousResult = false;
 		Eigen::VectorXcd resultVector_init;
 		string orthogonalize = "objectiveFunction";
 		bool FFTSensitivityMode = false;
-		//bool useMultGrid = false;
 
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -344,7 +368,9 @@ namespace Analysis {
 		
 		//for FFTSensitivityAnalysis
 		void RunFFTSensitivityAnalysis();
-		double RunFowardCalc(std::vector<double> x,bool isCalcGradient=false);
+		double  RunFowardCalc(std::vector<double> x, bool isCalcGradient = false);
+		vector<double>   RunFowardCalcForJacobian(std::vector<double> x);
+		vector<double> CalcDataMisfitEachData();
 
 	};
 }

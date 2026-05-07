@@ -4,7 +4,7 @@ FV3DMT by Suzuki Atsushi is marked with CC0 1.0. To view a copy of this license,
 #define OPTIM_ENABLE_EIGEN_WRAPPERS
 //#define OPTIM_USE_OPENMP Comment out because openmp is used in each loop in the function Optimize()
 #pragma once
-#include "mimalloc_config.h"
+//#include "mimalloc_config.h"
 #include "optim.hpp"
 #include <vector>
 #include <Eigen/Sparse>
@@ -83,27 +83,61 @@ Analysis::Analysis::Analysis(ReadData::ReadData* readData) {
 	useLogScaleInElement = invSettings->useLogScaleInterpolation;
 
 	//params for FFT Sensitivity Analysis
-	FFTSensitivityMode=readData->isFFTSensitivityMode;
-	attenuation=readData->attenuation;
-	Nx=readData->Nx;
-	Ny=readData->Ny;
-	Nz=readData->Nz;
-	K=readData->K;
-	cells_window=readData->cells_window;
-	numEnsemble=readData->numEnsemble;
+	FFTSensitivityMode = readData->isFFTSensitivityMode;
+	attenuation = readData->attenuation;
+	Nx = readData->Nx;
+	Ny = readData->Ny;
+	Nz = readData->Nz;
+	Kx = readData->Kx;
+	Ky = readData->Ky;
+	Kz = readData->Kz;
+	cells_window = readData->cells_window;
+	cells_window_fft_x = readData->cells_window_fft_x;
+	cells_window_fft_y = readData->cells_window_fft_y;
+	cells_window_fft_z = readData->cells_window_fft_z;
+	cells_window_out_x = readData->cells_window_out_x;
+	cells_window_out_y = readData->cells_window_out_y;
+	cells_window_out_z = readData->cells_window_out_z;
+	numEnsemble = readData->numEnsemble;
+	corr_cells_x = readData->corr_cells_x;
+	corr_cells_y = readData->corr_cells_y;
+	corr_cells_z = readData->corr_cells_z;
+	if (corr_cells_x < 0) {
+		corr_cells_x = std::max(1, Kx / 4);
+	}
+	if (corr_cells_y < 0) {
+		corr_cells_y = std::max(1, Ky / 4);
+	}
+	if (corr_cells_z < 0) {
+		corr_cells_z = std::max(1, Kz / 4);
+	}
 
-	minX=readData->minX;
-	maxX=readData->maxX;
-	minY=readData->minY;
-	maxY=readData->maxY;
-	minZ=readData->minZ;
-	maxZ=readData->maxZ;
+	minX = readData->minX;
+	maxX = readData->maxX;
+	minY = readData->minY;
+	maxY = readData->maxY;
+	minZ = readData->minZ;
+	maxZ = readData->maxZ;
 
-	epsR=readData->epsR;
-	epsT=readData->epsT;
-	eps_window=readData->eps_window;
-	confidenceLevel1=readData->confidenceLevel1; //For line search to seek the solution within these values
-	confidenceLevel2=readData->confidenceLevel2;
+	epsR = readData->epsR;
+	epsT = readData->epsT;
+	replacedResistivityFile = readData->replacedResistivityFile;
+	eps_window = readData->eps_window;
+	eps_window_fft_x = readData->eps_window_fft_x;
+	eps_window_fft_y = readData->eps_window_fft_y;
+	eps_window_fft_z = readData->eps_window_fft_z;
+	fd_eps = readData->fd_eps;
+	null_sv_ratio_thresh = readData->null_sv_ratio_thresh;
+	max_null_directions = readData->max_null_directions;
+	min_null_directions = readData->min_null_directions;
+	max_redraw_trials = readData->max_redraw_trials;
+	candidate_pool_target = readData->candidate_pool_target;
+	max_allowed_selected_cosine = readData->max_allowed_selected_cosine;
+	first_direction_random = readData->first_direction_random;
+	confidenceLevel1 = readData->confidenceLevel1; //For line search to seek the solution within these values
+	confidenceLevel2 = readData->confidenceLevel2;
+	deltaRMSLevel1 = readData->deltaRMSLevel1;
+	deltaRMSLevel2 = readData->deltaRMSLevel2;
 	orthogonalize = readData->orthogonalize;
 	lambdaForFFT = readData->lambda;
 	usePreviousResult = readData->usePreviousResult;
@@ -1462,7 +1496,7 @@ void Analysis::Analysis::AssociationPropertiesToElements() {
 	for (auto itr = elementsVector.begin(); itr != elementsVector.end(); itr++) {
 		Element::Element* element = *itr;
 		bool findProp = false;
-		if (properties.find(element->propID) == properties.end()){
+		if (!properties.contains(element->propID)) {
 			std::cout << "No Property ID which set to Element in Data" << std::endl;
 			exit(1);
 		}
