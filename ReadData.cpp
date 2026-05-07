@@ -33,9 +33,9 @@ std::vector<std::string> ReadData::ReadData::split(std::string str) {
 	std::string subStr;
 	std::vector<char> del;
 	del.push_back(' ');
-	del.push_back ('\t');
-	del.push_back ('\n');
-	del.push_back ('\r');
+	del.push_back('\t');
+	del.push_back('\n');
+	del.push_back('\r');
 	for (const char c : str) {
 		bool delFlag = false;
 		for (auto itr = del.begin(); itr != del.end(); ++itr) {
@@ -44,7 +44,7 @@ std::vector<std::string> ReadData::ReadData::split(std::string str) {
 			}
 		}
 		//if (c == del) {
-		if (delFlag){
+		if (delFlag) {
 			if (!subStr.empty()) {
 				result.push_back(subStr);
 				subStr.clear();
@@ -54,7 +54,7 @@ std::vector<std::string> ReadData::ReadData::split(std::string str) {
 			subStr += c;
 		}
 	}
-	
+
 	if (!subStr.empty()) {
 		result.push_back(subStr);
 	}
@@ -128,7 +128,7 @@ std::vector<std::string> ReadData::ReadData::split(std::string str) {
 //}
 std::string ReadData::ReadData::AnalysisTag(std::string tmpLine) {
 	std::vector<std::string> line;
-	line= split(tmpLine);
+	line = split(tmpLine);
 	std::string tag;
 	for (auto itr = line.begin(); itr != line.end(); ++itr) {
 		std::string word = *itr;
@@ -173,7 +173,7 @@ std::string ReadData::ReadData::AnalysisTag(std::string tmpLine) {
 			break;
 		}
 		//else if (strcasecmp("#", &tmpWord[0]) == 0) {
-		else if(compare1==compare2){
+		else if (compare1 == compare2) {
 			tag = "COMMENT";
 			break;
 		}
@@ -190,7 +190,7 @@ std::string ReadData::ReadData::AnalysisTag(std::string tmpLine) {
 
 
 void ReadData::ReadData::ReadFile(std::string modelFileName, bool forwardCalc) {
-	
+
 	std::ifstream f(modelFileName);
 
 	std::string line;
@@ -265,7 +265,7 @@ std::vector<std::string> ReadData::ReadData::readNext(std::ifstream* f) {
 		std::string compare1{ word[0] };
 		std::string compare2{ "#" };
 
-		if (compare1==compare2) {
+		if (compare1 == compare2) {
 			continue;
 		}
 		else {
@@ -377,7 +377,7 @@ void ReadData::ReadData::AnalysisElements(std::ifstream* f) {
 	}
 	else {
 		int nodeID = 0;
-		unordered_map<double,unordered_map<double,unordered_map<double, Node::Node*>>> mapNodes;
+		unordered_map<double, unordered_map<double, unordered_map<double, Node::Node*>>> mapNodes;
 		while (true) {
 			if (strcasecmp(line[0].c_str(), "END") == 0) {
 				if (strcasecmp(line[1].c_str(), "ELEMENTS") == 0) {
@@ -413,12 +413,12 @@ void ReadData::ReadData::AnalysisElements(std::ifstream* f) {
 			centerCoord = centerCoord / 8.0;
 			double dx = (nodes[2].coeff(0) + nodes[6].coeff(0)) * 0.5 - nodes[0].coeff(0); //average
 			double dy = (nodes[2].coeff(1) + nodes[6].coeff(1)) * 0.5 - nodes[0].coeff(1); //average
-			double dz = (nodes[4].coeff(2) + nodes[5].coeff(2) + nodes[6].coeff(2) + nodes[7].coeff(2)) * 0.25 - 
+			double dz = (nodes[4].coeff(2) + nodes[5].coeff(2) + nodes[6].coeff(2) + nodes[7].coeff(2)) * 0.25 -
 				(nodes[0].coeff(2) + nodes[1].coeff(2) + nodes[2].coeff(2) + nodes[3].coeff(2)) * 0.25; //average
 			UnstructuredElement::UnstructuredElement* element = new UnstructuredElement::UnstructuredElement();
 			element->nodes.resize(8);
 			for (int i = 0; i < 8; i++) {
-				if (mapNodes.find(nodes[i].coeff(0))==mapNodes.end() || mapNodes[nodes[i].coeff(0)].find(nodes[i].coeff(1)) == mapNodes[nodes[i].coeff(0)].end() ||
+				if (mapNodes.find(nodes[i].coeff(0)) == mapNodes.end() || mapNodes[nodes[i].coeff(0)].find(nodes[i].coeff(1)) == mapNodes[nodes[i].coeff(0)].end() ||
 					mapNodes[nodes[i].coeff(0)][nodes[i].coeff(1)].find(nodes[i].coeff(2)) == mapNodes[nodes[i].coeff(0)][nodes[i].coeff(1)].end()) {
 					Node::Node* node = new Node::Node();
 					node->ID = nodeID;
@@ -427,10 +427,10 @@ void ReadData::ReadData::AnalysisElements(std::ifstream* f) {
 					mapNodes[nodes[i].coeff(0)][nodes[i].coeff(1)][nodes[i].coeff(2)] = node;
 					nodeID++;
 				}
-				else {		
+				else {
 					element->nodes[i] = mapNodes[nodes[i].coeff(0)][nodes[i].coeff(1)][nodes[i].coeff(2)];
 				}
-				
+
 			}
 			element->ID = ID;
 			element->rootCoord.coeffRef(0) = nodes[0].coeff(0);
@@ -447,7 +447,7 @@ void ReadData::ReadData::AnalysisElements(std::ifstream* f) {
 			element->CalcSurfaceAndVolume();
 			elements[ID] = element;
 			elementsVector.push_back(element);
-			
+
 			if (f->eof()) {
 				std::cout << "No END ELEMENTS In Data" << std::endl;
 				exit(1);
@@ -475,7 +475,7 @@ void ReadData::ReadData::AnalysisProperties(std::ifstream* f) {
 					}
 				}
 				if (strcasecmp(line[0].c_str(), "Resistivity") == 0) {
-						property->resistivity = stod(line[1]);
+					property->resistivity = stod(line[1]);
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "Type") == 0) {
@@ -539,7 +539,7 @@ void ReadData::ReadData::AnalysisBoundary(std::ifstream* f) {
 						break;
 					}
 				}
-				boundary->omega.push_back( stod(line[0]));
+				boundary->omega.push_back(stod(line[0]));
 				i++;
 				line = readNext(f);
 				if (f->eof()) {
@@ -594,8 +594,8 @@ void ReadData::ReadData::ReadImpedanceObsData(string obsFileName) {
 	int iID = lastObsDataID;
 	int count = 0;
 	while (!f.eof()) {
-		
-		if (line.size()!=2 && line.size() != 3) {
+
+		if (line.size() != 2 && line.size() != 3) {
 			std::cout << "Zobs Coordinate Setting is wrong." << std::endl;
 			exit(1);
 		}
@@ -632,7 +632,7 @@ void ReadData::ReadData::ReadImpedanceObsData(string obsFileName) {
 			line = readNext(&f);
 			Eigen::Matrix2d tmpWeightReal;
 			Eigen::Matrix2d tmpWeightImag;
-			tmpWeightReal.coeffRef(0, 0)=stod(line[0]);
+			tmpWeightReal.coeffRef(0, 0) = stod(line[0]);
 			tmpWeightImag.coeffRef(0, 0) = stod(line[1]);
 			tmpWeightReal.coeffRef(0, 1) = stod(line[2]);
 			tmpWeightImag.coeffRef(0, 1) = stod(line[3]);
@@ -733,7 +733,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 				break;
 			}
 		}
-	
+
 		if (strcasecmp(line[0].c_str(), "Parameters") == 0) {
 			line = readNext(f);
 			while (true) {
@@ -860,13 +860,13 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "InitialGuessFileForIterativesolver") == 0) {
-					invSettings->initialGuessFile=line[1];
+					invSettings->initialGuessFile = line[1];
 					line = readNext(f);
 				}
 				else if (strcasecmp(line[0].c_str(), "InitialGuessOutputFileForIterativesolver") == 0) {
 					invSettings->InitialGuessOutputFile = line[1];
 					line = readNext(f);
-					}
+				}
 
 
 				else if (strcasecmp(line[0].c_str(), "ToleranceIterativeSolver") == 0) {
@@ -988,7 +988,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 						exit(1);
 					}
 					line = readNext(f);
-					}
+				}
 				else if (strcasecmp(line[0].c_str(), "DistortionInversion") == 0) {
 					if (!strcasecmp("true", line[1].c_str())) {
 						invSettings->isInvertedDistortion = true;
@@ -1059,7 +1059,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 						exit(1);
 					}
 					line = readNext(f);
-					}
+				}
 				else if (strcasecmp(line[0].c_str(), "numTrunc") == 0) {
 					invSettings->numTrunc = stoi(line[1]);
 					if (stoi(line[1]) < 0.0) {
@@ -1067,9 +1067,10 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 						exit(1);
 					}
 					line = readNext(f);
-					}
+				}
+				
 				else {
-					std::cout << "Wrong Data in Parameters:" << line[0].c_str()<< std::endl;
+					std::cout << "Wrong Data in Parameters:" << line[0].c_str() << std::endl;
 					exit(1);
 				}
 
@@ -1171,7 +1172,7 @@ void ReadData::ReadData::AnalysisInvSettings(std::ifstream* f) {
 }
 
 
-void ReadData::ReadData::ReadInitialResistivityData (string resisFile) {
+void ReadData::ReadData::ReadInitialResistivityData(string resisFile) {
 	//Impedance
 	std::ifstream f(resisFile);
 	struct stat st;
@@ -1207,7 +1208,7 @@ void ReadData::ReadData::ReadInitialResistivityData (string resisFile) {
 		tmpInitialData->ID = iID;
 		tmpInitialData->coord = coord;
 		tmpInitialData->resistivity = resis;
-		
+
 		initialResistivityData.push_back(tmpInitialData);
 
 		iID++;
@@ -1247,7 +1248,7 @@ void ReadData::ReadData::ReadInitialDistortionData(string distFile) {
 		double x = stod(line[0]);
 		double y = stod(line[1]);
 		//double z = stod(line[2]);
-		mat.coeffRef(0,0) = stod(line[3]);
+		mat.coeffRef(0, 0) = stod(line[3]);
 		mat.coeffRef(0, 1) = stod(line[4]);
 		mat.coeffRef(1, 0) = stod(line[5]);
 		mat.coeffRef(1, 1) = stod(line[6]);
@@ -1273,16 +1274,16 @@ void ReadData::ReadData::ReadInitialDistortionData(string distFile) {
 
 
 void ReadData::ReadData::AnalysisLocationCalcSettings(std::ifstream* f) {
-	
+
 	std::vector<std::string> line = readNext(f);
 	locationCalcSettings->isCalc = true;
 
 	while (true) {
 		if (strcasecmp(line[0].c_str(), "END") == 0) {
-			
+
 			if (strcasecmp(line[1].c_str(), "LocationCalcSettings") == 0) {
 				break;
-				
+
 			}
 		}
 		else if (strcasecmp(line[0].c_str(), "ExecuteCalculation") == 0) {
@@ -1312,7 +1313,7 @@ void ReadData::ReadData::AnalysisLocationCalcSettings(std::ifstream* f) {
 		}
 		else if (strcasecmp(line[0].c_str(), "numOfSplit") == 0) {
 			locationCalcSettings->numOfSplit = stoi(line[1]);
-			if (locationCalcSettings->numOfSplit<=0) {
+			if (locationCalcSettings->numOfSplit <= 0) {
 				std::cout << "numOfSplit In Location Calc Settings File must be equal to or more than 1." << std::endl;
 				exit(1);
 			}
@@ -1530,17 +1531,154 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 			line = readNext(f);
 		}
 		else if (strcasecmp(line[0].c_str(), "K") == 0) {
-			K = stoi(line[1]);
-			if (K <= 0.0) {
+			Kx = stoi(line[1]);
+			Ky = stoi(line[1]);
+			Kz = stoi(line[1]);
+			if (Kx <= 0.0) {
 				std::cout << "K must be equal more than 0." << std::endl;
 				exit(1);
 			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Kx") == 0) {
+			Kx = stoi(line[1]);
+
+			if (Kx <= 0.0) {
+				std::cout << "K must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Ky") == 0) {
+			Ky = stoi(line[1]);
+
+			if (Ky <= 0.0) {
+				std::cout << "K must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "Kz") == 0) {
+			Kz = stoi(line[1]);
+
+			if (Kz <= 0.0) {
+				std::cout << "K must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "CorrelationCellsForRandomNumberGeneration") == 0) {
+			int r = stoi(line[1]);
+			if (r < 0.0) {
+				std::cout << "CorrelationCellsForRandomNumberGeneration must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			corr_cells_x = r;
+			corr_cells_y = r;
+			corr_cells_z = r;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "CorrelationCellsForRandomNumberGeneration_X") == 0) {
+			int r = stoi(line[1]);
+			if (r < 0.0) {
+				std::cout << "CorrelationCellsForRandomNumberGeneration must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			corr_cells_x = r;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "CorrelationCellsForRandomNumberGeneration_Y") == 0) {
+			int r = stoi(line[1]);
+			if (r < 0.0) {
+				std::cout << "CorrelationCellsForRandomNumberGeneration must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			corr_cells_y = r;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "CorrelationCellsForRandomNumberGeneration_Z") == 0) {
+			int r = stoi(line[1]);
+			if (r < 0.0) {
+				std::cout << "CorrelationCellsForRandomNumberGeneration must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			corr_cells_z = r;
 			line = readNext(f);
 		}
 		else if (strcasecmp(line[0].c_str(), "cellsWindow") == 0) {
 			cells_window = stoi(line[1]);
 			if (cells_window <= 0.0) {
 				std::cout << "cellsWindow must be equal more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowFFT") == 0) {
+			const int v = stoi(line[1]);
+			if (v <= 0) {
+				std::cout << "cellsWindowFFT must be more than 0." << std::endl;
+				exit(1);
+			}
+			cells_window_fft_x = v;
+			cells_window_fft_y = v;
+			cells_window_fft_z = v;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowFFT_x") == 0) {
+			cells_window_fft_x = stoi(line[1]);
+			if (cells_window_fft_x < 0) {
+				std::cout << "cellsWindowFFT_x must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowFFT_y") == 0) {
+			cells_window_fft_y = stoi(line[1]);
+			if (cells_window_fft_y < 0) {
+				std::cout << "cellsWindowFFT_y must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowFFT_z") == 0) {
+			cells_window_fft_z = stoi(line[1]);
+			if (cells_window_fft_z < 0) {
+				std::cout << "cellsWindowFFT_z must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowOut") == 0) {
+			const int v = stoi(line[1]);
+			if (v < 0) {
+				std::cout << "cellsWindowOut must be more or equal to than 0." << std::endl;
+				exit(1);
+			}
+			cells_window_out_x = v;
+			cells_window_out_y = v;
+			cells_window_out_z = v;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowOut_x") == 0) {
+			cells_window_out_x = stoi(line[1]);
+			if (cells_window_out_x < 0) {
+				std::cout << "cellsWindowOut_x must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowOut_y") == 0) {
+			cells_window_out_y = stoi(line[1]);
+			if (cells_window_out_y < 0) {
+				std::cout << "cellsWindowOut_y must be more than or equal to 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "cellsWindowOut_z") == 0) {
+			cells_window_out_z = stoi(line[1]);
+			if (cells_window_out_z < 0) {
+				std::cout << "cellsWindowOut_z must be more than or equal to 0." << std::endl;
 				exit(1);
 			}
 			line = readNext(f);
@@ -1582,7 +1720,7 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 		}
 		else if (strcasecmp(line[0].c_str(), "epsR") == 0) {
 			epsR = stod(line[1]);
-			if (epsR <= 0.0) {
+			if (epsR < 0.0) {
 				std::cout << "epsR must be equal more than 0." << std::endl;
 				exit(1);
 			}
@@ -1590,7 +1728,7 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 		}
 		else if (strcasecmp(line[0].c_str(), "epsT") == 0) {
 			epsT = stod(line[1]);
-			if (epsT <= 0.0) {
+			if (epsT < 0.0) {
 				std::cout << "epsT must be equal more than 0." << std::endl;
 				exit(1);
 			}
@@ -1604,12 +1742,112 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 				usePreviousResult = true;
 			}
 			line = readNext(f);
-			}
+		}
 		else if (strcasecmp(line[0].c_str(), "epsWindow") == 0) {
 			eps_window = stod(line[1]);
 			if (eps_window <= 0.0) {
 				std::cout << "epsWindow must be equal more than 0." << std::endl;
 				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsWindowFFT") == 0) {
+			const double v = stod(line[1]);
+			if (v < 0.0 || v > 1.0) {
+				std::cout << "epsWindowFFT must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			eps_window_fft_x = v;
+			eps_window_fft_y = v;
+			eps_window_fft_z = v;
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsWindowFFT_x") == 0) {
+			eps_window_fft_x = stod(line[1]);
+			if (eps_window_fft_x < 0.0 || eps_window_fft_x > 1.0) {
+				std::cout << "epsWindowFFT_x must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsWindowFFT_y") == 0) {
+			eps_window_fft_y = stod(line[1]);
+			if (eps_window_fft_y < 0.0 || eps_window_fft_y > 1.0) {
+				std::cout << "epsWindowFFT_y must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "epsWindowFFT_z") == 0) {
+			eps_window_fft_z = stod(line[1]);
+			if (eps_window_fft_z < 0.0 || eps_window_fft_z > 1.0) {
+				std::cout << "epsWindowFFT_z must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "fd_eps") == 0) {
+			fd_eps = stod(line[1]);
+			if (fd_eps <= 0.0) {
+				std::cout << "fd_eps must be more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "null_sv_ratio_thresh") == 0) {
+			null_sv_ratio_thresh = stod(line[1]);
+			if (null_sv_ratio_thresh <= 0.0) {
+				std::cout << "null_sv_ratio_thresh must be more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "max_null_directions") == 0) {
+			max_null_directions = stoi(line[1]);
+			if (max_null_directions <= 0) {
+				std::cout << "max_null_directions must be more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "min_null_directions") == 0) {
+			min_null_directions = stoi(line[1]);
+			if (min_null_directions <= 0) {
+				std::cout << "min_null_directions must be more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "max_redraw_trials") == 0) {
+			max_redraw_trials = stoi(line[1]);
+			if (max_redraw_trials <= 0) {
+				std::cout << "max_redraw_trials must be more than 0." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "candidate_pool_target") == 0) {
+			candidate_pool_target = stoi(line[1]);
+			if (candidate_pool_target == 0) {
+				std::cout << "candidate_pool_target must not be 0. Use negative to keep default." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "max_allowed_selected_cosine") == 0) {
+			max_allowed_selected_cosine = stod(line[1]);
+			if (max_allowed_selected_cosine < 0.0 || max_allowed_selected_cosine > 1.0) {
+				std::cout << "max_allowed_selected_cosine must be between 0 and 1." << std::endl;
+				exit(1);
+			}
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "first_direction_random") == 0) {
+			if (!strcasecmp("true", line[1].c_str())) {
+				first_direction_random = true;
+			}
+			else {
+				first_direction_random = false;
 			}
 			line = readNext(f);
 		}
@@ -1638,18 +1876,38 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 			}
 			line = readNext(f);
 		}
-		else if (strcasecmp(line[0].c_str(), "orthogonalizationMethod") == 0) {
-			if (strcasecmp(line[0].c_str(), "gd") == 0) {
-				orthogonalize = "gd";
+		else if (strcasecmp(line[0].c_str(), "deltaRMSLevels") == 0) {
+			deltaRMSLevel1 = stod(line[1]);
+			deltaRMSLevel2 = stod(line[2]);
+			if (deltaRMSLevel1 <= 0.0) {
+				std::cout << "deltaRMSLevels must be more than 0." << std::endl;
+				exit(1);
 			}
-			else if (strcasecmp(line[0].c_str(), "both") == 0) {
-				orthogonalize = "both";
+			if (deltaRMSLevel2 <= 0.0) {
+				std::cout << "deltaRMSLevels must be more than 0." << std::endl;
+				exit(1);
 			}
-			else {
-				orthogonalize = "objectiveFunction";
+			if (deltaRMSLevel1 > deltaRMSLevel2) {
+				std::cout << "deltaRMSLevels1 must be less than deltaRMSLevels2." << std::endl;
+				exit(1);
 			}
 			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "orthogonalizationMethod") == 0) {
+			if (strcasecmp(line[1].c_str(), "gd") == 0) {
+				orthogonalize = "gd";
 			}
+			else if (strcasecmp(line[1].c_str(), "both") == 0) {
+				orthogonalize = "both";
+			}
+			else if (strcasecmp(line[1].c_str(), "objectiveFunction") == 0) {
+				orthogonalize = "objectiveFunction";
+			}
+			else {
+				orthogonalize = "None";
+			}
+			line = readNext(f);
+		}
 		else if (strcasecmp(line[0].c_str(), "InitialResistivityFile") == 0) {
 			ReadInitialResistivityData(line[1]);
 			line = readNext(f);
@@ -1661,6 +1919,10 @@ void ReadData::ReadData::AnalysisFFTSensitivityAnalysis(std::ifstream* f) {
 
 		else if (strcasecmp(line[0].c_str(), "ImpedanceFile") == 0) {
 			invSettings->impedanceFile = line[1];
+			line = readNext(f);
+		}
+		else if (strcasecmp(line[0].c_str(), "ReplacedResistivityFile") == 0) {
+			replacedResistivityFile = line[1];
 			line = readNext(f);
 		}
 		else if (strcasecmp(line[0].c_str(), "TipperFile") == 0) {
